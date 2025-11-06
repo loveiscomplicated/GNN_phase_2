@@ -106,6 +106,25 @@ def get_col_dims(df: pd.DataFrame):
     col_dims = [len(df[col].cat.categories) for col in df.columns]
     return col_dims
 
+def get_graph(x:pd.Series, y=None, edge_index=None):
+    '''
+    make numpy data to graph data (torch_geometric.data.Data)
+    Args:
+        x(pd.Series): row of dataframe
+        y(Optional): y-label, Default: None
+        edge_index(): COO matix, Default: None
+    Returns: instance of torch_geometric.data.Data
+    '''
+    x_tensor = torch.as_tensor(x.to_numpy()).unsqueeze(-1)
+
+    if y is not None:
+        y_tensor = torch.as_tensor(y.to_numpy(), dtype=torch.long)
+    else:
+        y_tensor = None
+
+    return Data(x=x_tensor, y=y_tensor, edge_index=edge_index)
+
+
 class DataBundle:
     def __init__(self, xdf:pd.DataFrame, ysr:pd.Series):
         '''
@@ -126,7 +145,7 @@ class DataBundle:
         self.ad, self.dis = get_ad_dis_col(self.xdf)
         self.edge_index_tem = fully_connected_edge_index(len(self.ad))
         self.col_dims_tem = get_col_dims(self.xdf[self.ad])
-        self.batches = []
+        self.signal_list = []
 
     def get_graph_lists(self):
         '''
@@ -134,8 +153,8 @@ class DataBundle:
         '''
         for idx in tqdm(list(self.xdf.index)):
             vec = self.xdf.loc[idx].to_numpy()
-            X = torch.tensor(vec).unsqueeze(-1) # 명시적으로 [num_nodes, 1] 형태로 만들기
-            y = torch.tensor(self.ysr.loc[idx], dtype=torch.long) # 손실 함수가 원하는 타입으로 맞추기 -> torch.long으로 해야 함
+            X = torch.as_tensor(vec).unsqueeze(-1) # 명시적으로 [num_nodes, 1] 형태로 만들기
+            y = torch.as_tensor(self.ysr.loc[idx], dtype=torch.long) # 손실 함수가 원하는 타입으로 맞추기 -> torch.long으로 해야 함
             self.graph_list.append(Data(X, self.edge_index, y=y))
         return self
     
@@ -159,55 +178,38 @@ class DataBundle:
         4. StaticGraphTemporalSignalBatch 객체 생성
         '''
         # 1. 개별 시계열 그래프 데이터 구성 및 패딩
-        node_feature_padding = torch.full((60,), 0)
-
         for i in tqdm(range(batch_size, self.xdf.shape[0], batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
             idx_list = list(self.xdf.iloc[i - batch_size : i].index)
-            individual_time_series_graph_data_list = []
+            idx_los_dict = {i:self.xdf.loc[i]['LOS'] for i in idx_list}
             mask = np.zeros((batch_size, 37)) # 배치 범위 안에 있던 행 인덱스, 위에서 아래로 추가됨, 어디서부터가 패딩인지 알려줌
-            # batch_index = None # 모든 그래프의 모든 노드가 속한 원래 그래프의 ID (예: {[0, 0, 0, 1, 1, 2, 2, 2, 2]}
-            for idx in tqdm(idx_list):
-                vec = self.xdf.loc[idx]
-                los = vec['LOS']
-                
-                admission = vec[self.ad].to_numpy()
-                discharge = vec[self.dis].to_numpy()
-
-                admission_t = torch.tensor(admission).unsqueeze(-1) # admission_t 접미사: tensor
-                discharge_t = torch.tensor(discharge)
-
-                # LOS - 1 만큼은 admission 데이터로
-                temporal_graph_list = [admission_t for i in range(los - 1)]
-
-                # LOS의 마지막은 discharge 데이터로
-                temporal_graph_list.append(discharge_t)
-
-                # LOS의 최대 길이(37)에 맞게 패딩
-                padding = [node_feature_padding for i in range(37 - los)]
-                temporal_graph_list.extend(padding)
-
-                individual_time_series_graph_data_list.append(temporal_graph_list)
-
-                # mask update
-                mask_index = len(individual_time_series_graph_data_list) - 1
-                ones = np.ones(los, int)
-                zeros = np.zeros(37-los, int)
-                mask_vec = np.concatenate(ones, zeros)
-                mask[mask_index, :] = mask_vec
-
-                # batch_index update
-                '''if batch_index is None:
-                    batch_index = np.zeros((los,), int)
-                else:
-                    cur_index = batch_index[-1] + 1
-                    batch_index = np.concatenate(batch_index, np.full((los,), cur_index))'''
-
-            # 블록 대각선 행렬-
-
+            ad, dis = get_ad_dis_col(self.xdf)
+            idx_ad_vec_dict = {i:torch.as_tensor(self.xdf.loc[i][ad].unsqueeze(-1).to_numpy()) for i in idx_list} # 인덱스 별 admission 시의 데이터(텐서)
+            idx_dis_vec_dict = {i:torch.as_tensor(self.xdf.loc[i][dis].to_numpy()) for i in idx_list} # 인덱스 별 discharge 시의 데이터(텐서)
+            padding = np.zeros((60,), int)
+            features = []
+            for time in range(1, 38): # 37은 LOS의 최대 값
+                graph_list = [] # 동일한 time, 동일한 batch인 그래프들의 모음, Data들의 리스트이므로 이걸 가지고 Batch 만들면 됨
+                for idx in idx_list:
+                    los = idx_los_dict[idx]
+                    if los < time:
+                        graph_list.append(padding)
+                    elif los == time: # discharge data
+                        x=idx_dis_vec_dict[idx]
+                        y=torch.tensor(self.ysr.loc[idx], dtype=torch.long)
+                        data = Data(x=x, y=y)
+                        graph_list.append(data)
+                    else: # los > time, admission data
+                        x=idx_ad_vec_dict[idx]
+                        y=torch.tensor(self.ysr.loc[idx], dtype=torch.long)
+                        data = Data(x=x, y=y) # edge_index는 지금 추가할 필요가 없음, 데이터 뻥튀기됨, pyg temporal batch 쓸 때 딱 한 번만 적용하면 됨, static graph이므로
+                        graph_list.append(data)
+                # 만들어진 graph_list가지고 Batch 만들기
+                batch = Batch.from_data_list(graph_list)
+                features.append(batch.x.numpy())
+            signal = StaticGraphTemporalSignalBatch(edge_index = self.edge_index, features=features)  # type: ignore
+            self.signal_list.append(signal)
         return self
-    '''
-    
-    '''
+
             
             
 def processing_main():
