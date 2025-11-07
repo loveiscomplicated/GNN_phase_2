@@ -236,46 +236,46 @@ class DataBundle:
                 for idx in idx_list
             }
 
-        features_seq = []
-        targets_seq  = []
-        mask_seq     = []
-        batch_vec_np = None
+            features_seq = []
+            targets_seq  = []
+            mask_seq     = []
+            batch_vec_np = None
 
-        for t in range(1, T + 1):
-            data_list_t = []
-            y_t = []
-            for idx in idx_list:
-                los = idx_los[idx]
-                y_i = int(self.ysr.loc[idx])
-                if t > los:
-                    x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
-                elif t == los:
-                    x = idx_dis_x[idx]
-                else:
-                    x = idx_ad_x[idx]
-                data_list_t.append(Data(x=x, y=torch.as_tensor(y_i)))
-                y_t.append(y_i)
-            
-            batch_t = Batch.from_data_list(data_list_t)
-            features_seq.append(batch_t.x.detach().cpu().numpy())
-            targets_seq.append(np.asarray(y_t, dtype=np.int64))
-            if batch_vec_np is None:
-                batch_vec_np = batch_t.batch.detach().cpu().numpy()
-            
-            # valid = 1 if any non-zero node exists (los >= t) else 0
-            # Here, define valid by LOS: valid=1 if t <= los else 0
-            mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
+            for t in range(1, T + 1):
+                data_list_t = []
+                y_t = []
+                for idx in idx_list:
+                    los = idx_los[idx]
+                    y_i = int(self.ysr.loc[idx])
+                    if t > los:
+                        x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
+                    elif t == los:
+                        x = idx_dis_x[idx]
+                    else:
+                        x = idx_ad_x[idx]
+                    data_list_t.append(Data(x=x, y=torch.as_tensor(y_i)))
+                    y_t.append(y_i)
+                
+                batch_t = Batch.from_data_list(data_list_t)
+                features_seq.append(batch_t.x.detach().cpu().numpy())
+                targets_seq.append(np.asarray(y_t, dtype=np.int64))
+                if batch_vec_np is None:
+                    batch_vec_np = batch_t.batch.detach().cpu().numpy()
+                
+                # valid = 1 if any non-zero node exists (los >= t) else 0
+                # Here, define valid by LOS: valid=1 if t <= los else 0
+                mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
 
-        signal = StaticGraphTemporalSignalBatch(
-            edge_index=edge_index_np,
-            edge_weight=None,
-            features=features_seq,
-            targets=targets_seq,          # graph-level labels per timestep
-            batches=batch_vec_np,         # node→graph mapping (constant across t)
-            mask=mask_seq                 # optional additional temporal feature
-        )
+            signal = StaticGraphTemporalSignalBatch(
+                edge_index=edge_index_np,
+                edge_weight=None,
+                features=features_seq,
+                targets=targets_seq,          # graph-level labels per timestep
+                batches=batch_vec_np,         # node→graph mapping (constant across t)
+                mask=mask_seq                 # optional additional temporal feature
+            )
 
-        self.signal_list.append(signal)
+            self.signal_list.append(signal)
         return self
 
             
