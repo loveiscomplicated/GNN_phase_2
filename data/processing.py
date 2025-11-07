@@ -37,7 +37,7 @@ def get_initial_data(random_state=42):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def get_sampled_initial_data(size=100, random_state=42):
+def get_initial_data_sampled(size=100, random_state=42):
     '''
     missing_corrected.csv를 불러오고,
     @@전체는 너무 많으니까 잘 돌아가는지 보기 위해 조금만 추출해서@@
@@ -57,7 +57,7 @@ def get_sampled_initial_data(size=100, random_state=42):
         DATA[col] = DATA[col].astype(pd.api.types.CategoricalDtype(categories=cats))
 
     DATA = DATA.iloc[:size]
-    
+
     # validation set, test set이 imputation 설계하는 데 들어가면 안 됨, 일종의 사후판단 정보가 들어갈 수 있기 때문
     y = DATA['REASONb']
     X = DATA.drop('REASONb', axis=1)
@@ -209,42 +209,78 @@ class DataBundle:
             총 130만 개의 그래프를 배치 사이즈(B) 단위로 묶어 처리 (볼록 대각선 행렬 방식)
         4. StaticGraphTemporalSignalBatch 객체 생성
         '''
+        # 공통으로 들어가는 변수들 먼저 정의
+        edge_index_np = self.edge_index_tem.detach().cpu().numpy()
+
+        ad, dis = self.ad, self.dis
+        num_nodes = len(ad)
+        T = 37 # max LOS
+        zero_vec = np.zeros((num_nodes,), dtype=np.float32)
+
         # 1. 개별 시계열 그래프 데이터 구성 및 패딩
-        for i in tqdm(range(batch_size, self.xdf.shape[0], batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
+        for i in tqdm(range(batch_size, self.xdf.shape[0] + 1, batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
             idx_list = list(self.xdf.iloc[i - batch_size : i].index)
-            idx_los_dict = {i:self.xdf.loc[i]['LOS'] for i in idx_list}
-            mask = np.zeros((batch_size, 37)) # 배치 범위 안에 있던 행 인덱스, 위에서 아래로 추가됨, 어디서부터가 패딩인지 알려줌
-            ad, dis = get_ad_dis_col(self.xdf)
-            idx_ad_vec_dict = {i:torch.as_tensor(self.xdf.loc[i][ad].unsqueeze(-1).to_numpy()) for i in idx_list} # 인덱스 별 admission 시의 데이터(텐서)
-            idx_dis_vec_dict = {i:torch.as_tensor(self.xdf.loc[i][dis].to_numpy()) for i in idx_list} # 인덱스 별 discharge 시의 데이터(텐서)
-            padding = np.zeros((60,), int)
-            features = []
-            for time in range(1, 38): # 37은 LOS의 최대 값
-                graph_list = [] # 동일한 time, 동일한 batch인 그래프들의 모음, Data들의 리스트이므로 이걸 가지고 Batch 만들면 됨
-                for idx in idx_list:
-                    los = idx_los_dict[idx]
-                    if los < time:
-                        graph_list.append(padding)
-                    elif los == time: # discharge data
-                        x=idx_dis_vec_dict[idx]
-                        y=torch.tensor(self.ysr.loc[idx], dtype=torch.long)
-                        data = Data(x=x, y=y)
-                        graph_list.append(data)
-                    else: # los > time, admission data
-                        x=idx_ad_vec_dict[idx]
-                        y=torch.tensor(self.ysr.loc[idx], dtype=torch.long)
-                        data = Data(x=x, y=y) # edge_index는 지금 추가할 필요가 없음, 데이터 뻥튀기됨, pyg temporal batch 쓸 때 딱 한 번만 적용하면 됨, static graph이므로
-                        graph_list.append(data)
-                # 만들어진 graph_list가지고 Batch 만들기
-                batch = Batch.from_data_list(graph_list)
-                features.append(batch.x.numpy())
-            signal = StaticGraphTemporalSignalBatch(edge_index = self.edge_index, features=features)  # type: ignore
-            self.signal_list.append(signal)
+            idx_los = {i: int(self.xdf.loc[i]['LOS']) for i in idx_list}
+
+            def vec_to_x(v):
+                v = np.asarray(v, dtype=np.float32).reshape(-1, 1)
+                return torch.as_tensor(v) # [60, 1]
+            
+            idx_ad_x = {
+                idx: vec_to_x(self.xdf.loc[idx, ad].to_numpy())
+                for idx in idx_list
+            }
+
+            idx_dis_x = {
+                idx: vec_to_x(self.xdf.loc[idx, dis].to_numpy())
+                for idx in idx_list
+            }
+
+        features_seq = []
+        targets_seq  = []
+        mask_seq     = []
+        batch_vec_np = None
+
+        for t in range(1, T + 1):
+            data_list_t = []
+            y_t = []
+            for idx in idx_list:
+                los = idx_los[idx]
+                y_i = int(self.ysr.loc[idx])
+                if t > los:
+                    x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
+                elif t == los:
+                    x = idx_dis_x[idx]
+                else:
+                    x = idx_ad_x[idx]
+                data_list_t.append(Data(x=x, y=torch.as_tensor(y_i)))
+                y_t.append(y_i)
+            
+            batch_t = Batch.from_data_list(data_list_t)
+            features_seq.append(batch_t.x.detach().cpu().numpy())
+            targets_seq.append(np.asarray(y_t, dtype=np.int64))
+            if batch_vec_np is None:
+                batch_vec_np = batch_t.batch.detach().cpu().numpy()
+            
+            # valid = 1 if any non-zero node exists (los >= t) else 0
+            # Here, define valid by LOS: valid=1 if t <= los else 0
+            mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
+
+        signal = StaticGraphTemporalSignalBatch(
+            edge_index=edge_index_np,
+            edge_weight=None,
+            features=features_seq,
+            targets=targets_seq,          # graph-level labels per timestep
+            batches=batch_vec_np,         # node→graph mapping (constant across t)
+            mask=mask_seq                 # optional additional temporal feature
+        )
+
+        self.signal_list.append(signal)
         return self
 
             
             
-def processing_main():
+def processing_static_main():
     print("loading initial data...")
     X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data(random_state=42)
     print("loading initial data done !!!")
@@ -263,11 +299,32 @@ def processing_main():
 
     return train_data_bundle.graph_list, val_data_bundle.graph_list, test_data_bundle.graph_list
 
+def processing_temporal_main():
+    print("loading initial data...(SAMPLED)")
+    X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data(random_state=42)
+    print("loading initial data done !!!")
+
+    print("converting into graph: train dataset")
+    train_data_bundle = DataBundle(X_train, y_train).get_temporal_graph_batches() # 메서드 체이닝
+    print("train dataset done !!", '\n')
+
+    print("converting into graph: validation dataset")
+    val_data_bundle = DataBundle(X_val, y_val).get_temporal_graph_batches()
+    print("validation dataset done !!", '\n')
+
+    print("converting into graph: test dataset")
+    test_data_bundle = DataBundle(X_test, y_test).get_temporal_graph_batches()
+    print("test dataset done !!", '\n')
+
+    return train_data_bundle.signal_list, val_data_bundle.signal_list, test_data_bundle.signal_list
+    
+
 if __name__ == "__main__":
-    graph = processing_main()
+    result = processing_temporal_main()
     import pickle
-    with open('graph_data.pickle', 'wb') as f:
-        pickle.dump(graph, f)
-    print("pickle data saved!")
+    save_path = 'temporal_grpah_data.pickle'
+    with open(save_path, 'wb') as f:
+        pickle.dump(result, f)
+    print("data saved !!")
 
     
