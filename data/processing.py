@@ -156,6 +156,26 @@ def get_graph(x:pd.Series, y=None, edge_index=None):
 
     return Data(x=x_tensor, y=y_tensor, edge_index=edge_index)
 
+def get_batch_index(current_batch_size: int, num_nodes=60):
+    '''
+    현재 배치의 사이즈에 맞춰서 batch index (torch_geometric.data.Batch.batch)를 수동으로 생성
+    (더 빠름, 기존에는 Data 객체를 일일히 생성한 뒤, 이를 Batch 객체에 init해야 함,
+    이건 넘파이로만 조작하기 때문에 더 빠름)
+    Args:
+        current_batch_size(int): "현재" batch_size, 일괄적으로 배치 사이즈를 정했더라도 마지막 꼬다리에서는 사이즈가 달라질 수 있으므로
+        num_nodes(int, Optional): default=60
+    Returns:
+        np.ndarray # size: (960,)
+    '''
+    batch_index = None
+    for i in range(current_batch_size):
+        if batch_index is None:
+            batch_index = np.zeros(num_nodes)
+        else:
+            batch_index = np.concatenate(batch_index, np.full((num_nodes,), i))
+    return batch_index
+
+
 
 class DataBundle:
     def __init__(self, xdf:pd.DataFrame, ysr:pd.Series):
@@ -215,17 +235,18 @@ class DataBundle:
         ad, dis = self.ad, self.dis
         num_nodes = len(ad)
         T = 37 # max LOS
+
         zero_vec = np.zeros((num_nodes,), dtype=np.float32)
+
+        def vec_to_x(v):
+            v = np.asarray(v, dtype=np.float32).reshape(-1, 1)
+            return torch.as_tensor(v) # [60, 1]
 
         # 1. 개별 시계열 그래프 데이터 구성 및 패딩
         for i in tqdm(range(batch_size, self.xdf.shape[0] + 1, batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
             idx_list = list(self.xdf.iloc[i - batch_size : i].index)
             idx_los = {i: int(self.xdf.loc[i]['LOS']) for i in idx_list}
 
-            def vec_to_x(v):
-                v = np.asarray(v, dtype=np.float32).reshape(-1, 1)
-                return torch.as_tensor(v) # [60, 1]
-            
             idx_ad_x = {
                 idx: vec_to_x(self.xdf.loc[idx, ad].to_numpy())
                 for idx in idx_list
@@ -275,7 +296,7 @@ class DataBundle:
                 mask=mask_seq                 # optional additional temporal feature
             )
 
-            self.signal_list.append(signal)
+            self.signal_list.append(signal) # lists of StaticGraphTemporalSignalBatch
         return self
 
             
