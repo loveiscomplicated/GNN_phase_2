@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 from tqdm import tqdm
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
 
 from processing_utils import get_initial_data, get_initial_data_sampled, fully_connected_edge_index, get_col_dims
@@ -106,82 +106,92 @@ class DataBundle:
         self.signal_list = []
     
     def get_temporal_graph_batches(self, batch_size=16):
-        '''
-        매 시점마다 여러 개의 그래프를 하나로 묶어서 배치로 만드는 것
-        즉 한 시점 안에서
-            여러 개의 그래프의 정보가 들어 있는 노드 피처 매트릭스, 엣지 인덱스, (y 라벨-이건 종료시에만)
-        이와 동시에 종료 시점이 그래프마다 상이하므로 모두 가장 긴 경우(37)에 맞춰서 패딩 & 마스크를 해야 함
-        이걸 37개 시점까지 만들어서 리스트로 묶어서 StaticGraphTemporalSignalBatch에 넣으면 됨
+            '''
+            매 시점마다 여러 개의 그래프를 하나로 묶어서 배치로 만드는 것
+            즉 한 시점 안에서
+                여러 개의 그래프의 정보가 들어 있는 노드 피처 매트릭스, 엣지 인덱스, (y 라벨-이건 종료시에만)
+            이와 동시에 종료 시점이 그래프마다 상이하므로 모두 가장 긴 경우(37)에 맞춰서 패딩 & 마스크를 해야 함
+            이걸 37개 시점까지 만들어서 리스트로 묶어서 StaticGraphTemporalSignalBatch에 넣으면 됨
 
-        이걸 130만 / 배치 사이즈 만큼 해야 함
+            이걸 130만 / 배치 사이즈 만큼 해야 함
 
-        1. 개별 시계열 그래프 데이터 구성 및 패딩
-        2. 마스크 생성 및 저장 - 패딩된 데이터가 실제 데이터인지, 패딩된 가짜 데이터인지를 구분할 수 있는 마스크 시퀀스를 별도로 생성
-            예를 들어 1이면 유효한 값, 0이면 패딩되어 무시해야 하는 값
-            이건 StaticGraphTemporalSignalBatch이 기본적으로 받는 인수가 아니므로 추가 feature로 집어넣거나 따로 가지고 있어야 함
-            마스크는 (batch_size, 37), 배치 범위 안에 있던 행 인덱스, 위에서 아래로 추가됨
-        3. 2단계: StaticGraphTemporalSignalBatch 입력 데이터 준비
-            총 130만 개의 그래프를 배치 사이즈(B) 단위로 묶어 처리 (볼록 대각선 행렬 방식)
-        4. StaticGraphTemporalSignalBatch 객체 생성
-        '''
-        # 공통으로 들어가는 변수들 먼저 정의
-        edge_index_np = self.edge_index_tem.detach().cpu().numpy()
+            1. 개별 시계열 그래프 데이터 구성 및 패딩
+            2. 마스크 생성 및 저장 - 패딩된 데이터가 실제 데이터인지, 패딩된 가짜 데이터인지를 구분할 수 있는 마스크 시퀀스를 별도로 생성
+                예를 들어 1이면 유효한 값, 0이면 패딩되어 무시해야 하는 값
+                이건 StaticGraphTemporalSignalBatch이 기본적으로 받는 인수가 아니므로 추가 feature로 집어넣거나 따로 가지고 있어야 함
+                마스크는 (batch_size, 37), 배치 범위 안에 있던 행 인덱스, 위에서 아래로 추가됨
+            3. 2단계: StaticGraphTemporalSignalBatch 입력 데이터 준비
+                총 130만 개의 그래프를 배치 사이즈(B) 단위로 묶어 처리 (볼록 대각선 행렬 방식)
+            4. StaticGraphTemporalSignalBatch 객체 생성
+            '''
+            # 공통으로 들어가는 변수들 먼저 정의
+            edge_index_np = self.edge_index_tem.detach().cpu().numpy()
 
-        ad, dis = self.ad, self.dis
-        num_nodes = len(ad)
-        T = 37 # max LOS
+            ad, dis = self.ad, self.dis
+            num_nodes = len(ad)
+            T = 37 # max LOS
+            zero_vec = np.zeros((num_nodes,), dtype=np.float32)
 
-        zero_vec = np.zeros((num_nodes,), dtype=np.float32)
+            # 1. 개별 시계열 그래프 데이터 구성 및 패딩
+            for i in tqdm(range(batch_size, self.xdf.shape[0] + 1, batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
+                idx_list = list(self.xdf.iloc[i - batch_size : i].index)
+                idx_los = {i: int(self.xdf.loc[i]['LOS']) for i in idx_list}
 
-        # 1. 개별 시계열 그래프 데이터 구성 및 패딩
-        for i in tqdm(range(batch_size, self.xdf.shape[0] + 1, batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
-            idx_list = list(self.xdf.iloc[i - batch_size : i].index)
-            idx_los = {i: int(self.xdf.loc[i]['LOS']) for i in idx_list}
-
-            idx_ad_x = {
-                idx: self.xdf.loc[idx, ad].to_numpy()
-                for idx in idx_list
-            }
-
-            idx_dis_x = {
-                idx: self.xdf.loc[idx, dis].to_numpy()
-                for idx in idx_list
-            }
-
-            features_seq = []
-            mask_seq     = []
-            batch_vec_np = get_batch_index(len(idx_list))
-
-            y = self.ysr.loc[idx_list].to_numpy()
-
-            for t in range(1, T + 1):
-                data_list_t = []
-                for idx in idx_list:
-                    los = idx_los[idx]
-                    if t < los: # admission
-                        data_list_t.append(idx_ad_x[idx])
-                    elif t == los: # discharge
-                        data_list_t.append(idx_dis_x[idx])
-                    else:
-                        data_list_t.append(zero_vec)
-                features_seq.append(np.concatenate(data_list_t))
-                mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
-            
-            targets_seq = [np.zeros((num_nodes*batch_size,)) for _ in range(T)]
+                def vec_to_x(v):
+                    v = np.asarray(v, dtype=np.float32).reshape(-1, 1)
+                    return torch.as_tensor(v) # [60, 1]
                 
-            signal = StaticGraphTemporalSignalBatch(
-                edge_index=edge_index_np,
-                edge_weight=None,
-                features=features_seq,
-                targets=targets_seq,
-                batches=batch_vec_np,         # node→graph mapping (constant across t)
-                mask=mask_seq,                # optional additional temporal feature
-                graph_label = y
-            )
+                idx_ad_x = {
+                    idx: vec_to_x(self.xdf.loc[idx, ad].to_numpy())
+                    for idx in idx_list
+                }
 
-            self.signal_list.append(signal) # lists of StaticGraphTemporalSignalBatch
-        return self
+                idx_dis_x = {
+                    idx: vec_to_x(self.xdf.loc[idx, dis].to_numpy())
+                    for idx in idx_list
+                }
 
+                features_seq = []
+                targets_seq  = []
+                mask_seq     = []
+                batch_vec_np = None
+
+                for t in range(1, T + 1):
+                    data_list_t = []
+                    y_t = []
+                    for idx in idx_list:
+                        los = idx_los[idx]
+                        y_i = int(self.ysr.loc[idx])
+                        if t > los:
+                            x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
+                        elif t == los:
+                            x = idx_dis_x[idx]
+                        else:
+                            x = idx_ad_x[idx]
+                        data_list_t.append(Data(x=x, y=torch.as_tensor(y_i)))
+                        y_t.append(y_i)
+                    
+                    batch_t = Batch.from_data_list(data_list_t)
+                    features_seq.append(batch_t.x.detach().cpu().numpy())
+                    targets_seq.append(np.asarray(y_t, dtype=np.int64))
+                    if batch_vec_np is None:
+                        batch_vec_np = batch_t.batch.detach().cpu().numpy()
+                    
+                    # valid = 1 if any non-zero node exists (los >= t) else 0
+                    # Here, define valid by LOS: valid=1 if t <= los else 0
+                    mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
+
+                signal = StaticGraphTemporalSignalBatch(
+                    edge_index=edge_index_np,
+                    edge_weight=None,
+                    features=features_seq,
+                    targets=targets_seq,          # graph-level labels per timestep
+                    batches=batch_vec_np,         # node→graph mapping (constant across t)
+                    mask=mask_seq                 # optional additional temporal feature
+                )
+
+                self.signal_list.append(signal)
+            return self
 
 def processing_temporal_main():
     print("loading initial data...(SAMPLED)")
