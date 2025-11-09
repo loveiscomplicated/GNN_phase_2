@@ -86,6 +86,43 @@ def get_batch_index(current_batch_size: int, num_nodes=60) -> np.ndarray:
 
     return batch_index
 
+def get_label_encoder(df:pd.DataFrame):
+    '''
+    Pandas Category 타입 DataFrame의 모든 컬럼에 대해,
+    원본 값(Categories)을 값의 크기 순서대로 0부터 시작하는
+    연속적인 코드(Index)로 매핑하는 딕셔너리를 생성
+
+    Args:
+        df (pd.DataFrame): 모든 컬럼이 Category 타입인 DataFrame
+
+    Returns:
+        dict: {컬럼명: {원본_값: 인코딩_코드, ...}, ...} 형태의 레이블 인코더 딕셔너리
+    '''
+    label_encoder = {}
+    for col in df.columns:
+        col_dict = {}
+        cats = sorted(list(df[col].cat.categories))
+        for i, cat in enumerate(cats):
+            col_dict[cat] = i
+        label_encoder[col] = col_dict
+    return label_encoder
+
+def label_encoder(df: pd.DataFrame) -> pd.DataFrame:
+    '''
+    생성된 레이블 인코더 딕셔너리를 사용하여 DataFrame에 인코딩을 적용
+    '''
+    # 원본 DataFrame의 복사본을 만들어 변경합니다.
+    df_encoded = df.copy() 
+    encoder = get_label_encoder(df)
+
+    # 딕셔너리를 사용하여 각 컬럼을 매핑합니다.
+    for col, mapping in encoder.items():
+        if col in df_encoded.columns:
+            # Series.map() 메서드는 딕셔너리 매핑에 최적화되어 있습니다.
+            df_encoded[col] = df_encoded[col].map(mapping).astype(np.int64)
+            
+    return df_encoded
+
 class DataBundle:
     def __init__(self, xdf:pd.DataFrame, ysr:pd.Series):
         '''
@@ -93,14 +130,17 @@ class DataBundle:
             x: X_train, X_val, X_test 중 하나
             y: y_train, y_val, y_test 중 하나
         '''
-        self.xdf = xdf
-        self.ysr = ysr
 
         # temporal data
-        self.ad, self.dis = get_ad_dis_col(self.xdf)
+        self.ad, self.dis = get_ad_dis_col(xdf)
         self.edge_index_tem = fully_connected_edge_index(len(self.ad))
-        self.col_dims_tem = get_col_dims(self.xdf[self.ad])
+        self.col_dims_tem = get_col_dims(xdf[self.ad])
         self.signal_list = []
+
+        
+        self.xdf = label_encoder(xdf)
+        self.ysr = ysr
+
     
     def get_temporal_graph_batches(self, batch_size=16):
             '''
