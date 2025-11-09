@@ -1,6 +1,12 @@
 import torch
-from temporalgcn import TGCN
-from temporalgcn import TGCN2
+from .temporalgcn import TGCN
+from .temporalgcn import TGCN2
+
+import sys
+import os
+cur_dir = os.path.dirname(__file__)
+parent_dir = os.path.join(cur_dir, '..')
+sys.path.append(parent_dir)
 from utils.device_set import device_set
 
 

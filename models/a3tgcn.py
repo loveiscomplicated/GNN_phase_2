@@ -1,15 +1,15 @@
-import os
-import sys
-
-file_path = os.path.dirname(__file__)
-parent_dir = os.path.join(file_path, '..')
-sys.path.append(parent_dir)
-
 import torch
 import torch.nn as nn
+import numpy as np
 from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
-from entity_embedding import EntityEmbeddingBatch
-from attentiontemporalgcn import A3TGCN2
+
+import sys
+import os
+cur_dir = os.path.dirname(__file__)
+parent_dir = os.path.join(cur_dir, '..')
+sys.path.append(parent_dir)
+from .entity_embedding import EntityEmbeddingBatch
+from .attentiontemporalgcn import A3TGCN2
 
 class A3TGCNCat2(nn.Module):
     def __init__(self, col_dims, col_list, num_layers, hidden_channel, out_channel=2):
@@ -32,7 +32,7 @@ class A3TGCNCat2(nn.Module):
         first_layer = A3TGCN2(in_channels=a3tgcn_input_channel, 
                               out_channels=hidden_channel, 
                               periods=1, 
-                              batch_size=None)
+                              batch_size=None) # type: ignore
         self.a3tgcn_layers.append(first_layer)
         
 
@@ -41,7 +41,7 @@ class A3TGCNCat2(nn.Module):
             hidden_layer = A3TGCN2(in_channels=hidden_channel, 
                                    out_channels=hidden_channel, 
                                    periods=1, 
-                                   batch_size=None)
+                                   batch_size=None) # type: ignore
             self.a3tgcn_layers.append(hidden_layer)
 
         # 분류기 정의
@@ -55,7 +55,7 @@ class A3TGCNCat2(nn.Module):
         """
 
         입력으로 T개의 시점을 가진 시계열 그래프 배치 리스트를 받고,
-        이를 4D 텐서(B, N_max, D, T)로 변환하고 다층(L) A3TGCN2 레이어를
+        이를 4D 텐서(B, N_max, F, T)로 변환하고 다층(L) A3TGCN2 레이어를
         통과시켜 시공간적 특징을 추출
         각 레이어의 최종 은닉 상태를 풀링(Readout)하여 그래프 임베딩을 얻고,
         이를 모두 연결(concatenate)하여 최종 이진 분류(REASONb) 로짓을 반환
@@ -64,6 +64,9 @@ class A3TGCNCat2(nn.Module):
             signal_batch (list): 
                                 T (시점 수)개의 `torch_geometric.data.Batch` 객체 리스트.
                                 [Batch_t1, Batch_t2, ..., Batch_tT]
+            time_mask(list):
+                                넘파이 벡터들의 리스트. 각각의 요소는 매 시점 별 batch 안에서 누가 살아남았는지
+
             template_edge_index(torch.LongTensor):
                                 어차피 모든 그래프의 구조가 동일하므로 처음 인풋으로 한 번만 입력
         Returns:
@@ -79,17 +82,35 @@ class A3TGCNCat2(nn.Module):
         N = batch_snapshot_0.x.shape[0] // B # N = N_total / B
         
         for batch_snapshot in signal_batch:
-            # 엔티티 임베딩: (N_total, D)
+            # 엔티티 임베딩: (N_total, F)
             embedded_features = self.entitiy_embedding(batch_snapshot)
 
-            # (B * N, D) -> (B, N, D)
+            # (B * N, F) -> (B, N, F)
             features_dense = embedded_features.reshape(B, N, -1)
             features_3d_list.append(features_dense)
+
         # 1.3. 시간 축 T로 스택
-        # X_in 셰이프: (B, N, D, T)
-        T = len(features_3d_list)
+        # X_in 셰이프: (B, N, F, T)
+        T_max = len(features_3d_list)
         X_in = torch.stack(features_3d_list, dim=3)
         
+        DEVICE = X_in.device
+        F = X_in.shape[2]
+        
+        # 1. 마스크 축 변환: (T, B) -> (B, T)
+        # PyTorch 텐서 셰이프 순서에 맞춤
+        time_mask = [batch_.mask for batch_ in signal_batch]
+        mask_BT = torch.as_tensor(torch.stack(time_mask, dim=0).T, dtype=torch.long)
+        
+        # 2. 마스크 확장: (B, T) -> (B, N, F, T)
+        # N, D 축에 맞춰 확장 (unsqueeze(1) for N, unsqueeze(2) for F)
+        mask_BNDT = mask_BT.unsqueeze(1).unsqueeze(2).expand(B, N, F, T_max)
+        
+        # 3. X_in에 마스크 적용
+        # False(0)인 위치의 특징 값은 0이 되고, True(1)인 위치는 유지됨.
+        X_in = X_in * mask_BNDT.float().to(DEVICE)
+
+
         # 2. A3TGCN2 시퀀스 처리 및 배치 Readout
         h_list = []
         
@@ -100,7 +121,7 @@ class A3TGCNCat2(nn.Module):
             x_out = a3tgcn(X_in, template_edge_index) 
             
             # 다음 레이어 입력 구성: (B, N, H, T)
-            X_in = x_out.unsqueeze(3).repeat(1, 1, 1, T)
+            X_in = x_out.unsqueeze(3).repeat(1, 1, 1, T_max)
             
             # ⭐️ Global Pooling (Readout) 간소화
             # N 차원 (dim=1)에 대해 평균을 계산
@@ -135,6 +156,7 @@ if __name__ == "__main__":
     col_list, col_dim = pickle_dataset[3]
     num_features = len(col_list)
     template_edge_index = pickle_dataset[0][0][0].edge_index.to(DEVICE)
+    time_mask = pickle_dataset[0][0][0].mask
 
     train_dataset = pickle_dataset[0]
 
@@ -144,6 +166,7 @@ if __name__ == "__main__":
 
     # 손실 함수
     criterion = nn.CrossEntropyLoss()
+    criterion.to(DEVICE)
 
     # 최적화 알고리즘
     learning_rate = 1e-3
@@ -152,8 +175,9 @@ if __name__ == "__main__":
     # 포워드
     for signal in train_dataset:
         batch_list = [batch.to(DEVICE) for batch in signal]
-        logit = model.forward(batch_list, template_edge_index)
-        print(logit)
+        logits = model.forward(batch_list, template_edge_index)
+        print(logits)
+        loss = criterion(logits, signal[0].y.to(DEVICE))
     
 
         
