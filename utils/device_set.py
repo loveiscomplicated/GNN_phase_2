@@ -10,3 +10,12 @@ def mps_device_set():
     print(f'Using device: {device}')
     return device
 
+def device_set():
+    device = torch.device('cpu')
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.mps.is_available():
+        device = torch.device('mps')
+
+    return device
