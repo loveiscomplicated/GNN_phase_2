@@ -1,4 +1,5 @@
 import torch
+import os
 
 def cuda_device_set():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -16,6 +17,7 @@ def device_set():
     if torch.cuda.is_available():
         device = torch.device('cuda')
     elif torch.mps.is_available():
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
         device = torch.device('mps')
 
     print(f'Using device: {device}')
