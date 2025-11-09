@@ -70,9 +70,6 @@ def get_batch_index(current_batch_size: int, num_nodes=60) -> np.ndarray:
         np.ndarray: PyTorch Geometric의 batch index 배열. size: (current_batch_size * num_nodes,)
     '''
     
-    # 1. 각 그래프의 인덱스 배열을 생성합니다.
-    # 예: i=0일 때 [0, 0, ..., 0], i=1일 때 [1, 1, ..., 1]
-    
     batch_indices = []
     for i in range(current_batch_size):
         # i 번째 그래프에 해당하는 노드 인덱스 배열 (길이: num_nodes, 값: i)
@@ -130,16 +127,17 @@ class DataBundle:
             ad, dis = self.ad, self.dis
             num_nodes = len(ad)
             T = 37 # max LOS
-            zero_vec = np.zeros((num_nodes,), dtype=np.float32)
+            zero_vec = np.zeros((num_nodes,), dtype=np.int64)
 
             # 1. 개별 시계열 그래프 데이터 구성 및 패딩
-            for i in tqdm(range(batch_size, self.xdf.shape[0] + 1, batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
-                idx_list = list(self.xdf.iloc[i - batch_size : i].index)
+            for i in tqdm(range(0, self.xdf.shape[0], batch_size)): # 데이터프레임의 행 인덱스들을 위에서부터 배치 단위로 가져 옴
+                end = min(i + batch_size, self.xdf.shape[0])
+                idx_list = list(self.xdf.iloc[i : end].index)
                 idx_los = {i: int(self.xdf.loc[i]['LOS']) for i in idx_list}
 
                 def vec_to_x(v):
-                    v = np.asarray(v, dtype=np.float32).reshape(-1, 1)
-                    return torch.as_tensor(v) # [60, 1]
+                    v = np.asarray(v, dtype=np.int64).reshape(-1, 1)
+                    return torch.as_tensor(v, dtype=torch.long) # [60, 1]
                 
                 idx_ad_x = {
                     idx: vec_to_x(self.xdf.loc[idx, ad].to_numpy())
@@ -154,7 +152,7 @@ class DataBundle:
                 features_seq = []
                 targets_seq  = []
                 mask_seq     = []
-                batch_vec_np = None
+                batch_vec_np = get_batch_index(len(idx_list), num_nodes=num_nodes)
 
                 for t in range(1, T + 1):
                     data_list_t = []
@@ -164,19 +162,16 @@ class DataBundle:
                         y_i = int(self.ysr.loc[idx])
                         if t > los:
                             x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
-                        elif t == los:
+                        elif t == los: # discharge
                             x = idx_dis_x[idx]
-                        else:
+                        else: # admission
                             x = idx_ad_x[idx]
                         data_list_t.append(Data(x=x, y=torch.as_tensor(y_i)))
                         y_t.append(y_i)
                     
                     batch_t = Batch.from_data_list(data_list_t)
-                    features_seq.append(batch_t.x.detach().cpu().numpy())
+                    features_seq.append(batch_t.x.detach().cpu().numpy()) # type: ignore
                     targets_seq.append(np.asarray(y_t, dtype=np.int64))
-                    if batch_vec_np is None:
-                        batch_vec_np = batch_t.batch.detach().cpu().numpy()
-                    
                     # valid = 1 if any non-zero node exists (los >= t) else 0
                     # Here, define valid by LOS: valid=1 if t <= los else 0
                     mask_seq.append(np.asarray([1 if t <= idx_los[idx] else 0 for idx in idx_list], dtype=np.int64))
@@ -195,7 +190,7 @@ class DataBundle:
 
 def processing_temporal_main():
     print("loading initial data...(SAMPLED)")
-    X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data_sampled(random_state=42)
+    X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data_sampled(size=1000, random_state=42)
     print("loading initial data done !!!")
 
     print("converting into graph: train dataset")
@@ -216,7 +211,7 @@ def processing_temporal_main():
 if __name__ == "__main__":
     result = processing_temporal_main()
     import pickle
-    save_path = 'temporal_grpah_data.pickle'
+    save_path = 'Sampled_temporal_graph_data_fully_connected.pickle'
     with open(save_path, 'wb') as f:
         pickle.dump(result, f)
     print("data saved !!")
