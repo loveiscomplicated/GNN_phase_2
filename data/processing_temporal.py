@@ -205,7 +205,11 @@ def processing_temporal_main():
     test_data_bundle = DataBundle(X_test, y_test).get_temporal_graph_batches()
     print("test dataset done !!", '\n')
 
-    return train_data_bundle.signal_list, val_data_bundle.signal_list, test_data_bundle.signal_list
+    print("extracting col_dicts for Entity Embedding...")
+    col_dict = {i: len(test_data_bundle.xdf[i].cat.categories) for i in test_data_bundle.ad}
+    print("extract col_dicts for Entity Embedding done !!")
+
+    return train_data_bundle.signal_list, val_data_bundle.signal_list, test_data_bundle.signal_list, col_dict
     
 
 if __name__ == "__main__":
