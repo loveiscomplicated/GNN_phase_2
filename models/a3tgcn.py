@@ -1,8 +1,14 @@
+import os
+import sys
+
+file_path = os.path.dirname(__file__)
+parent_dir = os.path.join(file_path, '..')
+sys.path.append(parent_dir)
+
 import torch
 import torch.nn as nn
-
 from entity_embedding import EntityEmbeddingBatch
-from .attentiontemporalgcn import A3TGCN2
+from attentiontemporalgcn import A3TGCN2
 
 class A3TGCNCat(nn.Module):
     def __init__(self, col_dims, col_list, num_layers, input_channel, hidden_channel, out_channel=2):
@@ -104,3 +110,19 @@ class A3TGCNCat(nn.Module):
         logits = self.classifier_b(combined_h)
         
         return logits
+    
+if __name__ == "__main__":
+    import pickle
+    import os
+    import torch
+    dir_path = os.path.dirname(__file__)
+    data_path = os.path.join(dir_path, '..', 'data', 'Sampled_temporal_graph_data_fully_connected.pickle')
+    with open(data_path, 'rb') as f:
+        pickle_dataset = pickle.load(f)
+    
+    batch_indi = pickle_dataset[0][0][0]
+    
+    col_list, col_dim = pickle_dataset[3]
+    num_features = len(col_list)
+    
+    model = A3TGCNCat(col_dims=col_dim, col_list=col_list, num_layers=2, input_channel=25, hidden_channel=64, out_channel=2)

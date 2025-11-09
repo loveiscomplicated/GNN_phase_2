@@ -1,7 +1,6 @@
 import torch
-from .temporalgcn import TGCN
-from .temporalgcn import TGCN2
-from torch_geometric.nn import GCNConv
+from temporalgcn import TGCN
+from temporalgcn import TGCN2
 from utils.device_set import device_set
 
 
