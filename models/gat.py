@@ -15,7 +15,7 @@ class GAT(nn.Module):
         self.gat_layers.append(GATConv(gat_in_channels, hidden_channels, heads=heads, dropout=dropout))
         for _ in range(num_layers - 2):
             self.gat_layers.append(GATConv(hidden_channels * heads, hidden_channels, heads=heads, dropout=dropout))
-        self.gat_layers.append(GATConv(hidden_channels * heads, hidden_channels, heads=1, dropout=dropout)) 
+        self.gat_layers.append(GATConv(hidden_channels * heads, output_channels, heads=1, dropout=dropout)) 
         
     
     def forward(self, x_cats):

@@ -31,16 +31,5 @@ class EntityEmbedding(torch.nn.Module):
         outs_tensor = torch.stack(outs, dim = 1)
         return outs_tensor
     
-if __name__ == "__main__":
-    # 실행 예시
-    import os
-    CURDIR = os.path.dirname(__file__)
-    DATA_PATH = os.path.join(CURDIR, '..', 'data', 'missing_corrected.csv')
-    DATA = pd.read_csv(DATA_PATH)
-    
-    col_list = list(DATA.columns)
-    col_dims = [len(DATA[col].cat.categories) for col in DATA.columns]
-
-    EntityEmbedding(col_dims, col_list)
 
     
