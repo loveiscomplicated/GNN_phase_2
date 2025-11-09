@@ -161,7 +161,7 @@ class DataBundle:
                         los = idx_los[idx]
                         y_i = int(self.ysr.loc[idx])
                         if t > los:
-                            x = torch.tensor(zero_vec, dtype=torch.float32).unsqueeze(-1)
+                            x = torch.tensor(zero_vec, dtype=torch.int64).unsqueeze(-1)
                         elif t == los: # discharge
                             x = idx_dis_x[idx]
                         else: # admission
@@ -206,16 +206,23 @@ def processing_temporal_main():
     print("test dataset done !!", '\n')
 
     print("extracting col_dicts for Entity Embedding...")
-    col_dict = {i: len(test_data_bundle.xdf[i].cat.categories) for i in test_data_bundle.ad}
+    col_list = test_data_bundle.ad
+    col_dim = test_data_bundle.col_dims_tem
+    col_info = (col_list, col_dim)
     print("extract col_dicts for Entity Embedding done !!")
 
-    return train_data_bundle.signal_list, val_data_bundle.signal_list, test_data_bundle.signal_list, col_dict
+    return train_data_bundle.signal_list, val_data_bundle.signal_list, test_data_bundle.signal_list, col_info
     
 
 if __name__ == "__main__":
     result = processing_temporal_main()
     import pickle
     save_path = 'Sampled_temporal_graph_data_fully_connected.pickle'
+    # 피클 파일은 길이 4의 리스트
+    # 0. train_data의 StaticGraphTemporalSignalBatch 리스트
+    # 1. val
+    # 2. test
+    # 3. col_info -> col_info = (admission-col_list, col_dim) --> 나중에 엔티티 임베딩할 때 쓸 거
     with open(save_path, 'wb') as f:
         pickle.dump(result, f)
     print("data saved !!")
