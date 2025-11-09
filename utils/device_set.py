@@ -18,4 +18,6 @@ def device_set():
     elif torch.mps.is_available():
         device = torch.device('mps')
 
+    print(f'Using device: {device}')
+
     return device
