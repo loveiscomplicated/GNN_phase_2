@@ -7,22 +7,29 @@ sys.path.append(parent_dir)
 
 import torch
 import torch.nn as nn
+from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
 from entity_embedding import EntityEmbeddingBatch
 from attentiontemporalgcn import A3TGCN2
 
-class A3TGCNCat(nn.Module):
-    def __init__(self, col_dims, col_list, num_layers, input_channel, hidden_channel, out_channel=2):
+class A3TGCNCat2(nn.Module):
+    def __init__(self, col_dims, col_list, num_layers, hidden_channel, out_channel=2):
+        '''
+        input_channel이 없는 이유는 정수 레이블이 인풋으로 들어가기 때문 (항상 1)
+        hidden_channel: A3TGCNCat2에서의 히든 차원의 수
+        out_channel: A3TGCNCat2에서의 결과 차원의 수
+        '''
         super().__init__()
         self.num_layers = num_layers
 
         # 엔티티 임베딩 레이어 정의
         self.entitiy_embedding = EntityEmbeddingBatch(col_dims, col_list)
 
+        a3tgcn_input_channel = self.entitiy_embedding.proj_dim
         # A3TGCN2 레이어 정의
         self.a3tgcn_layers = nn.ModuleList()
         
         # 첫 번째 레이어 정의
-        first_layer = A3TGCN2(in_channels=input_channel, 
+        first_layer = A3TGCN2(in_channels=a3tgcn_input_channel, 
                               out_channels=hidden_channel, 
                               periods=1, 
                               batch_size=None)
@@ -54,10 +61,9 @@ class A3TGCNCat(nn.Module):
         이를 모두 연결(concatenate)하여 최종 이진 분류(REASONb) 로짓을 반환
 
         Args:
-            signal_batch (StaticGraphTemporalSignalBatch): 
+            signal_batch (list): 
                                 T (시점 수)개의 `torch_geometric.data.Batch` 객체 리스트.
                                 [Batch_t1, Batch_t2, ..., Batch_tT]
-                                이거 자료형이 신기하긴 한데 리스트처럼 사용해도 완전 무방 (애초에 그렇게 설계됨)
             template_edge_index(torch.LongTensor):
                                 어차피 모든 그래프의 구조가 동일하므로 처음 인풋으로 한 번만 입력
         Returns:
@@ -67,14 +73,14 @@ class A3TGCNCat(nn.Module):
         features_3d_list = []
 
         # 엣지 인덱스 및 배치 벡터는 시점 불변이므로 첫 번째 스냅샷에서 추출
+        # 즉, batch_snapshot_0은 Batch 객체
         batch_snapshot_0 = signal_batch[0]
-        B = batch_snapshot_0.num_graphs  # 배치 크기
-        N = batch_snapshot_0.num_nodes // B # N = N_total / B
-        
+        B = batch_snapshot_0.batch_size  # 배치 크기
+        N = batch_snapshot_0.x.shape[0] // B # N = N_total / B
         
         for batch_snapshot in signal_batch:
             # 엔티티 임베딩: (N_total, D)
-            embedded_features = self.entitiy_embedding(batch_snapshot.x)
+            embedded_features = self.entitiy_embedding(batch_snapshot)
 
             # (B * N, D) -> (B, N, D)
             features_dense = embedded_features.reshape(B, N, -1)
@@ -111,18 +117,44 @@ class A3TGCNCat(nn.Module):
         
         return logits
     
+    
 if __name__ == "__main__":
+    # 포워드 잘 되는지만 보는 용도
     import pickle
     import os
     import torch
+    from utils.device_set import device_set
+    DEVICE = device_set()
     dir_path = os.path.dirname(__file__)
     data_path = os.path.join(dir_path, '..', 'data', 'Sampled_temporal_graph_data_fully_connected.pickle')
     with open(data_path, 'rb') as f:
         pickle_dataset = pickle.load(f)
     
-    batch_indi = pickle_dataset[0][0][0]
+    signal1 = pickle_dataset[0][0] # signal 객체
     
     col_list, col_dim = pickle_dataset[3]
     num_features = len(col_list)
+    template_edge_index = pickle_dataset[0][0][0].edge_index.to(DEVICE)
+
+    train_dataset = pickle_dataset[0]
+
+    # 모델 준비
+    model = A3TGCNCat2(col_dims=col_dim, col_list=col_list, num_layers=3, hidden_channel=64, out_channel=2)
+    model.to(DEVICE)
+
+    # 손실 함수
+    criterion = nn.CrossEntropyLoss()
+
+    # 최적화 알고리즘
+    learning_rate = 1e-3
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # 포워드
+    for signal in train_dataset:
+        batch_list = [batch.to(DEVICE) for batch in signal]
+        logit = model.forward(batch_list, template_edge_index)
+        print(logit)
     
-    model = A3TGCNCat(col_dims=col_dim, col_list=col_list, num_layers=2, input_channel=25, hidden_channel=64, out_channel=2)
+
+        
+            
