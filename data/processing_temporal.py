@@ -6,7 +6,7 @@ from tqdm import tqdm
 from torch_geometric.data import Data, Batch
 from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
 
-from processing_utils import get_initial_data, get_initial_data_sampled, fully_connected_edge_index, get_col_dims
+from .processing_utils import get_initial_data, get_initial_data_sampled, fully_connected_edge_index, get_col_dims
 
 def get_ad_dis_col(df:pd.DataFrame):
     '''
@@ -123,6 +123,7 @@ def label_encoder(df: pd.DataFrame) -> pd.DataFrame:
             
     return df_encoded
 
+
 class DataBundle:
     def __init__(self, xdf:pd.DataFrame, ysr:pd.Series):
         '''
@@ -141,7 +142,6 @@ class DataBundle:
         self.xdf = label_encoder(xdf)
         self.ysr = ysr
 
-    
     def get_temporal_graph_batches(self, batch_size=16):
             '''
             매 시점마다 여러 개의 그래프를 하나로 묶어서 배치로 만드는 것
@@ -230,7 +230,7 @@ class DataBundle:
 
 def processing_temporal_main():
     print("loading initial data...(SAMPLED)")
-    X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data_sampled(size=1000, random_state=42)
+    X_train, X_val, X_test, y_train, y_val, y_test = get_initial_data(random_state=42)
     print("loading initial data done !!!")
 
     print("converting into graph: train dataset")
