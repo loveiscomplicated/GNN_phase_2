@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     # 데이터 로드
     CURDIR = os.path.dirname(__file__)
-    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data.pickle')
+    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi.pickle')
     with open(DATA_PATH, 'rb') as f:
         pickle_dataset = pickle.load(f)
         print("pickle_dataset loaded!!")
