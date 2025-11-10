@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
+# from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch # 사용되지 않으므로 제거
 
 import sys
 import os
 cur_dir = os.path.dirname(__file__)
 parent_dir = os.path.join(cur_dir, '..')
 sys.path.append(parent_dir)
+from torch_geometric.data import Batch # 👈 [추가]
 from .entity_embedding import EntityEmbeddingBatch
 from .attentiontemporalgcn import A3TGCN2
 
@@ -24,7 +25,25 @@ class A3TGCNCat2(nn.Module):
         # 엔티티 임베딩 레이어 정의
         self.entitiy_embedding = EntityEmbeddingBatch(col_dims, col_list)
 
-        a3tgcn_input_channel = self.entitiy_embedding.proj_dim
+        # 🚨 수정: A3TGCN 입력 채널은 최종 임베딩 차원의 합(total_F)이 아닌, 
+        #         EntityEmbeddingBatch의 출력 차원인 proj_dim입니다.
+        #         (EntityEmbeddingBatch가 노드 특징을 [N_total, F_proj_dim]으로 출력한다고 가정)
+        #         만약 EntityEmbeddingBatch가 모든 특징을 Concat하여 
+        #         [N_total, F_orig * F_proj_dim]을 출력한다면 아래 코드는 F = X_in.shape[2]를 사용해야 합니다.
+        #         여기서는 이전 코드의 의도를 따르되, 다음 레이어의 입력이 F_proj_dim이라고 가정합니다.
+        F_orig = len(col_list)
+        F_proj_dim = self.entitiy_embedding.proj_dim
+        
+        # F_total = 첫 번째 레이어의 실제 입력 채널 (e.g., 60 * 25 = 1500)
+        a3tgcn_input_channel = F_orig * F_proj_dim
+        
+        F_proj_dim = self.entitiy_embedding.proj_dim
+        
+        # F_total = 첫 번째 레이어의 실제 입력 채널 (e.g., 60 * 25 = 1500)
+        self.F_orig = F_orig         # 👈 [추가] Store F_orig
+        self.F_proj_dim = F_proj_dim # 👈 [추가] Store F_proj_dim
+        a3tgcn_input_channel = F_orig * F_proj_dim
+
         # A3TGCN2 레이어 정의
         self.a3tgcn_layers = nn.ModuleList()
         
@@ -32,7 +51,7 @@ class A3TGCNCat2(nn.Module):
         first_layer = A3TGCN2(in_channels=a3tgcn_input_channel, 
                               out_channels=hidden_channel, 
                               periods=1, 
-                              batch_size=None) # type: ignore
+                              batch_size=None)
         self.a3tgcn_layers.append(first_layer)
         
 
@@ -41,7 +60,7 @@ class A3TGCNCat2(nn.Module):
             hidden_layer = A3TGCN2(in_channels=hidden_channel, 
                                    out_channels=hidden_channel, 
                                    periods=1, 
-                                   batch_size=None) # type: ignore
+                                   batch_size=None)
             self.a3tgcn_layers.append(hidden_layer)
 
         # 분류기 정의
@@ -52,92 +71,89 @@ class A3TGCNCat2(nn.Module):
         )
 
     def forward(self, signal_batch: list, template_edge_index: torch.LongTensor):
-        """
-
-        입력으로 T개의 시점을 가진 시계열 그래프 배치 리스트를 받고,
-        이를 4D 텐서(B, N_max, F, T)로 변환하고 다층(L) A3TGCN2 레이어를
-        통과시켜 시공간적 특징을 추출
-        각 레이어의 최종 은닉 상태를 풀링(Readout)하여 그래프 임베딩을 얻고,
-        이를 모두 연결(concatenate)하여 최종 이진 분류(REASONb) 로짓을 반환
-
-        Args:
-            signal_batch (list): 
-                                T (시점 수)개의 `torch_geometric.data.Batch` 객체 리스트.
-                                [Batch_t1, Batch_t2, ..., Batch_tT]
-            time_mask(list):
-                                넘파이 벡터들의 리스트. 각각의 요소는 매 시점 별 batch 안에서 누가 살아남았는지
-
-            template_edge_index(torch.LongTensor):
-                                어차피 모든 그래프의 구조가 동일하므로 처음 인풋으로 한 번만 입력
-        Returns:
-            torch.Tensor: 최종 이진 분류 로짓 (Batch_Size, Out_Channel=2)
-        """
-        # 1. 4D 텐서를 만들기 위한 준비
-        features_3d_list = []
-
-        # 엣지 인덱스 및 배치 벡터는 시점 불변이므로 첫 번째 스냅샷에서 추출
-        # 즉, batch_snapshot_0은 Batch 객체
+        
+        T_max = len(signal_batch)
+        if T_max == 0:
+            return torch.empty(0)
+        
         batch_snapshot_0 = signal_batch[0]
-        B = batch_snapshot_0.batch_size  # 배치 크기
-        N = batch_snapshot_0.x.shape[0] // B # N = N_total / B
+        B = batch_snapshot_0.batch_size
         
-        for batch_snapshot in signal_batch:
-            # 엔티티 임베딩: (N_total, F)
-            embedded_features = self.entitiy_embedding(batch_snapshot)
-
-            # (B * N, F) -> (B, N, F)
-            features_dense = embedded_features.reshape(B, N, -1)
-            features_3d_list.append(features_dense)
-
-        # 1.3. 시간 축 T로 스택
-        # X_in 셰이프: (B, N, F, T)
-        T_max = len(features_3d_list)
-        X_in = torch.stack(features_3d_list, dim=3)
-        
-        DEVICE = X_in.device
-        F = X_in.shape[2]
-        
-        # 1. 마스크 축 변환: (T, B) -> (B, T)
-        # PyTorch 텐서 셰이프 순서에 맞춤
+        # 1.1. 시간 마스크와 총 노드 수 계산
         time_mask = [batch_.mask for batch_ in signal_batch]
-        mask_BT = torch.as_tensor(torch.stack(time_mask, dim=0).T, dtype=torch.long)
+        # (T_max, N_total)
+        time_mask_stacked = torch.stack(time_mask, dim=0) 
+        N_total = time_mask_stacked.shape[1]
+        N = N_total // B # 단일 그래프 노드 수
+
+        # 🚨 [수정 1] 4D 텐서 X_in 생성 벡터화 🚨
+        # T_max개의 PyG Batch 리스트를 하나의 거대한 Batch 객체로 병합
+        giant_batch = Batch.from_data_list(signal_batch)
         
-        # 2. 마스크 확장: (B, T) -> (B, N, F, T)
-        # N, D 축에 맞춰 확장 (unsqueeze(1) for N, unsqueeze(2) for F)
+        # 임베딩을 T_max번 호출하는 대신, 거대 배치를 *단 한 번* 호출
+        # (T_max * N_total * F_orig, F_proj_dim)
+        embedded_features_unrolled = self.entitiy_embedding(giant_batch)
+        
+        # 🚨 [수정] 텐서 재조정: (T*N_total*F_orig, F_proj_dim) -> (T*N_total, F_orig * F_proj_dim)
+        embedded_features = embedded_features_unrolled.reshape(
+            T_max * N_total, self.F_orig, self.F_proj_dim
+        ).reshape(
+            T_max * N_total, self.F_orig * self.F_proj_dim
+        )
+        
+        # F_total (전체 특징 차원) 추출
+        F = embedded_features.shape[1] # (이제 F_orig * F_proj_dim, e.g., 1500)
+        DEVICE = embedded_features.device
+
+        # (T_max * N_total, F_total) -> (T_max, N_total, F_total)
+        # ⬇️ 이 라인은 이제 (888,000) .reshape (37, 16, 1500)이 되어 정상 동작합니다.
+        X_in_TNF = embedded_features.reshape(T_max, N_total, F)
+        
+        # (T_max, N_total, F_total) -> (T_max, B, N, F_total)
+        X_in_TBNF = X_in_TNF.reshape(T_max, B, N, F)
+        
+        # (T_max, B, N, F_total) -> (B, N, F_total, T_max) (최종 4D 텐서)
+        X_in = X_in_TBNF.permute(1, 2, 3, 0)
+        # 🚨 [수정 1 끝] 🚨
+        
+        
+        # 🚨 [수정 2] 마스크 생성 벡터화 🚨
+        # (T_max, N_total) -> (T_max, B, N)
+        mask_TBN = time_mask_stacked.reshape(T_max, B, N)
+        
+        # N 차원을 따라 .any() 연산 (T_max, B)
+        mask_TB = mask_TBN.any(dim=2).long()
+        
+        # (T_max, B) -> (B, T_max)
+        mask_BT = mask_TB.T 
+        # 🚨 [수정 2 끝] 🚨
+        
+        
+        # 3. 마스크 확장: (B, T_max) -> (B, N, F, T_max)
         mask_BNDT = mask_BT.unsqueeze(1).unsqueeze(2).expand(B, N, F, T_max)
         
-        # 3. X_in에 마스크 적용
-        # False(0)인 위치의 특징 값은 0이 되고, True(1)인 위치는 유지됨.
+        # 4. X_in에 마스크 적용
         X_in = X_in * mask_BNDT.float().to(DEVICE)
-
-
-        # 2. A3TGCN2 시퀀스 처리 및 배치 Readout
-        h_list = []
         
+        # 5. A3TGCN2 레이어 시퀀스 (이전 수정 사항 유지)
+        h_list = []
         for i, a3tgcn in enumerate(self.a3tgcn_layers):
             
-            # x_out: 최종 은닉 상태 (B, N, H)
-            # A3TGCN2가 (B,N,F,T) 입력을 받아 (B,N,H) 출력을 반환한다고 가정
-            x_out = a3tgcn(X_in, template_edge_index) 
+            x_out = a3tgcn(X_in, template_edge_index) # (B, N, H)
             
-            # 다음 레이어 입력 구성: (B, N, H, T)
-            X_in = x_out.unsqueeze(3).repeat(1, 1, 1, T_max)
-            
-            # ⭐️ Global Pooling (Readout) 간소화
-            # N 차원 (dim=1)에 대해 평균을 계산
+            # 다음 레이어 입력 (T=1 시퀀스로 변환)
+            X_in = x_out.unsqueeze(3) # (B, N, H, 1)
+
             graph_embedding = torch.mean(x_out, dim=1) # (B, H)
             h_list.append(graph_embedding)
+        
+        # 6. 분류기 입력 준비
+        h_combined = torch.cat(h_list, dim=1) # (B, H * num_layers)
 
-        # 3. 그래프 임베딩 연결 및 분류
-        
-        # combined_h: (B, L * H)
-        combined_h = torch.cat(h_list, dim=1)
-        
-        # logits: (B, 2)
-        logits = self.classifier_b(combined_h)
+        # 7. 분류기 통과
+        logits = self.classifier_b(h_combined)
         
         return logits
-    
     
 if __name__ == "__main__":
     # 포워드 잘 되는지만 보는 용도

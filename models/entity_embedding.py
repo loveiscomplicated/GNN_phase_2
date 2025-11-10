@@ -36,29 +36,51 @@ class EntityEmbedding(torch.nn.Module):
             outs.append(out)
         outs_tensor = torch.stack(outs, dim = 1)
         return outs_tensor
+# entity_embedding.py 파일의 EntityEmbeddingBatch.forward 함수 수정
 
 class EntityEmbeddingBatch(EntityEmbedding):
     def forward(self, batch: Batch):
-        '''
-        Args:
-            batch(Data): torch_geometric의 Data 객체.
-                         batch.x is expected to be of shape [num_nodes * num_features, 1]
-        Returns:
-            outs_tensor(torch.Tensor): [num_nodes * num_features, proj_dim]
-        '''
-        outs = []
-        features = batch.x.long() # type: ignore
-
-        for i, label in enumerate(features):
-            col_idx = i % len(self.col_list)
-            out = self.embs[col_idx](label)
-            outs.append(out)
-
-        # vstack results in shape [num_nodes * num_features, proj_dim]
-        outs_tensor = torch.vstack(outs)
-        return outs_tensor
         
+        # 1. features 텐서 준비
+        features = batch.x.long() # 현재 features.device == cpu (문제의 원인)
+        
+        # 🚨 해결책: features 텐서를 모델 파라미터와 동일한 장치로 명시적으로 이동 🚨
+        # self.embs[0]의 장치를 가져와서 features를 그 장치로 이동시킵니다.
+        # 이렇게 하면 features와 모델 파라미터가 동일한 장치에서 연산됩니다.
+        TARGET_DEVICE = self.embs[0].weight.device
+        features = features.to(TARGET_DEVICE)
+        DEVICE = features.device 
+        
+        # features의 shape가 [X, 1]이면 [X]로 squeeze (nn.Embedding을 위해)
+        if features.dim() > 1 and features.size(1) == 1:
+            features = features.squeeze(1) # (N_total * F_count)
+        
+        N_total_F = features.shape[0]
+        F_count = len(self.col_list)
+        
+        # 2. 텐서 분리 및 인덱스 생성
+        # col_indices 생성 시 이미 DEVICE를 사용하고 있으므로, 이제 DEVICE는 MPS/GPU입니다.
+        col_indices = torch.arange(F_count, device=DEVICE).repeat(N_total_F // F_count)
+        
+        # 3. 각 임베딩 레이어를 사용하여 해당하는 인덱스를 한 번에 처리
+        all_embedded_features = []
+        for i, emb in enumerate(self.embs):
+            
+            mask = (col_indices == i)
+            data_to_embed = features[mask]
+            
+            embedded_data = emb(data_to_embed) # 이제 CPU 텐서가 아닌 GPU 텐서 입력
+            
+            all_embedded_features.append((embedded_data, torch.where(mask)[0]))
 
+        # 4. 원래의 순서대로 결과를 재조립
+        outs_tensor = torch.zeros(N_total_F, self.proj_dim, device=DEVICE) 
+        for embedded_data, indices in all_embedded_features:
+            outs_tensor[indices] = embedded_data
+
+        return outs_tensor
+    
+    
 if __name__ == "__main__":
     import pickle
     import os
