@@ -1,12 +1,15 @@
-
+import os
 import pandas as pd
 import numpy as np
 import torch
 from tqdm import tqdm
 from torch_geometric.data import Data, Batch
 from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch
+import pickle
 
-from .processing_utils import get_initial_data, get_initial_data_sampled, fully_connected_edge_index, get_col_dims
+from .processing_utils import get_initial_data, get_initial_data_sampled, fully_connected_edge_index, get_col_dims, get_initial_data_sampled_stratified
+
+CURDIR = os.path.dirname(__file__)
 
 def get_ad_dis_col(df:pd.DataFrame):
     '''
@@ -123,6 +126,48 @@ def label_encoder(df: pd.DataFrame) -> pd.DataFrame:
             
     return df_encoded
 
+def load_mi_dict():
+    data_path = os.path.join(CURDIR, 'mi_dict.pickle')
+    with open(data_path, 'rb') as f:
+        mi_dict = pickle.load(f)
+    return mi_dict
+
+def build_edge_index_from_mi_directed(top_k=7, return_edge_attr=False):
+    """
+    mi_dict: {col_name: pd.Series} (index=다른 변수명, value=MI, 내림차순 정렬)
+    top_k: 각 src에서 MI 상위 k개로만 유향 엣지(src->dst) 생성
+    return_edge_attr: True면 edge_attr로 MI 가중치 반환
+    """
+    mi_dict = load_mi_dict()
+    cols = list(mi_dict.keys())
+    col_to_idx = {c: i for i, c in enumerate(cols)}
+
+    src_idx, dst_idx, weights = [], [], []
+
+    for src in cols:
+        series = mi_dict[src]
+
+        # 우리 그래프에 존재하는 변수만 남기고, 자기 자신은 제외
+        series = series[series.index.isin(cols)]
+        if src in series.index:
+            series = series.drop(index=src)
+
+        # 상위 k개 선택 (이미 내림차순 정렬되어 있다고 가정)
+        top_neighbors = series.head(top_k)
+
+        for dst, w in top_neighbors.items():
+            src_idx.append(col_to_idx[src])
+            dst_idx.append(col_to_idx[dst])
+            if return_edge_attr:
+                weights.append(float(w))
+
+    edge_index = torch.tensor([src_idx, dst_idx], dtype=torch.long)
+
+    if return_edge_attr:
+        edge_attr = torch.tensor(weights, dtype=torch.float)
+        return edge_index, edge_attr
+
+    return edge_index
 
 class DataBundle:
     def __init__(self, xdf:pd.DataFrame, ysr:pd.Series):
@@ -134,7 +179,8 @@ class DataBundle:
 
         # temporal data
         self.ad, self.dis = get_ad_dis_col(xdf)
-        self.edge_index_tem = fully_connected_edge_index(len(self.ad))
+        # self.edge_index_tem = fully_connected_edge_index(len(self.ad))
+        self.edge_index_tem = build_edge_index_from_mi_directed(top_k=7)
         self.col_dims_tem = get_col_dims(xdf[self.ad])
         self.signal_list = []
 
@@ -257,7 +303,7 @@ def processing_temporal_main():
 if __name__ == "__main__":
     result = processing_temporal_main()
     import pickle
-    save_path = 'Sampled_temporal_graph_data_fully_connected.pickle'
+    save_path = 'temporal_graph_data_MI.pickle'
     # 피클 파일은 길이 4의 리스트
     # 0. train_data의 StaticGraphTemporalSignalBatch 리스트
     # 1. val
