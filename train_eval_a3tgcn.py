@@ -130,15 +130,13 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
     y_pred_list = []
     y_scores_list = []
     
-    total_samples = len(test_dataset) # test_dataset은 배치(signal)의 리스트입니다.
+    total_samples = len(test_dataset)
     
     softmax = nn.Softmax(dim=1)
 
     with torch.no_grad():
-        # 🚨 루프 원상 복구: test_dataset을 직접 순회합니다.
         for signal in tqdm(test_dataset, desc="Evaluating"):
             
-            # 'signal'은 이미 T_max개의 PyG Batch 객체 리스트 (배치 상태)
             batch_list = []
             for batch in signal:
                 if hasattr(batch, 'to'):
@@ -146,19 +144,23 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
                 else:
                     batch_list.append(batch)
             
-            # 🚨 레이블 추출 수정 (그래프 분류) 🚨
-            # signal[0] (첫 스냅샷)에서 각 그래프의 시작 노드 인덱스를 찾습니다.
-            ptr = batch_list[0].ptr
-            start_nodes_of_each_graph = ptr[:-1] # (B,)
-            # 해당 노드의 y값을 그래프의 레이블로 사용합니다.
-            labels = batch_list[0].y[start_nodes_of_each_graph].long() # (B,)
+            # 🚨 [수정 1] .ptr 대신 .batch 속성 사용
+            batch_tensor = batch_list[0].batch
+            diff = torch.diff(batch_tensor)
+            change_indices = torch.where(diff != 0)[0] + 1
+            start_nodes_of_each_graph = torch.cat([
+                torch.tensor([0], device=batch_tensor.device), 
+                change_indices
+            ])
+            
+            # 🚨 [수정 2] 이진 변환 (raw_labels > 0)
+            raw_labels = batch_list[0].y[start_nodes_of_each_graph].long()
+            labels = (raw_labels > 0).long() # (B,)
             
             logits = model.forward(batch_list, template_edge_index)
             
             loss = criterion(logits, labels)
             
-            # 🚨 total_loss 누적 방식 수정 (배치 크기 B만큼 곱함)
-            # signal[0].batch_size는 B (예: 32)를 반환합니다.
             total_loss += loss.item() * batch_list[0].batch_size 
 
             probabilities = softmax(logits)
@@ -168,8 +170,12 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
             y_pred_list.extend(logits.argmax(dim=1).cpu().tolist())
             y_scores_list.extend(score_class_1.cpu().tolist())
             
-    # 🚨 평균 손실 계산 수정 (전체 샘플 수 = 배치 개수 * 배치 크기)
-    avg_loss = total_loss / (len(test_dataset) * test_dataset[0][0].batch_size) 
+    # 평균 손실 계산 수정
+    # 🚨 참고: test_dataset[0][0]이 존재하지 않을 수 있으므로, 
+    #    평균 배치 크기를 가정하거나, eval 루프 내에서 총 샘플 수를 세는 것이 더 안전합니다.
+    #    여기서는 간단히 첫 번째 배치의 크기를 사용합니다.
+    avg_batch_size = test_dataset[0][0].batch_size if total_samples > 0 else 1
+    avg_loss = total_loss / (total_samples * avg_batch_size) 
     
     metrics = compute_metrics(
         y_true_list, 
@@ -291,7 +297,7 @@ if __name__ == "__main__":
 
     # 데이터 로드
     CURDIR = os.path.dirname(__file__)
-    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi.pickle')
+    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi_sampled.pickle')
     with open(DATA_PATH, 'rb') as f:
         pickle_dataset = pickle.load(f)
         print("pickle_dataset loaded!!")
