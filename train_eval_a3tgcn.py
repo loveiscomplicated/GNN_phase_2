@@ -10,48 +10,6 @@ from utils.write_log import enable_dual_output
 
 # train_eval_a3tgcn.py 파일의 상단 import 부분 아래에 추가
 
-def collate_signals(signals):
-    """
-    여러 signal 객체(T개의 Batch 리스트)를 하나의 큰 배치 객체(T개의 Batch 리스트)로 묶습니다.
-    PyG Temporal의 Batch 객체 리스트를 병합하는 방식으로 작동합니다.
-    """
-    if not signals:
-        return []
-    
-    T_max = 37 # 시점의 수
-    
-    collated_batch_list = []
-    
-    for t in range(T_max):
-        # 각 시점 t에 해당하는 모든 signal의 Batch 객체를 모아 하나의 Batch로 병합
-        batch_list_at_t = [signal[t] for signal in signals]
-        # torch_geometric.data.Batch.from_data_list와 유사한 병합 기능 사용
-        # signal[t]는 PyG의 Batch 객체이므로, PyG의 collate 함수가 필요하지만,
-        # 여기서는 simple batching을 위해 각 속성을 수동으로 병합했다고 가정 (실제 PyG 코드를 대체)
-        
-        # NOTE: signal[t]는 이미 PyG의 Batch 객체이므로,
-        # PyG의 from_data_list 또는 Batch.from_data_list 역할을 하는 무언가를 사용해야 함.
-        # 가장 간단하게는 PyG의 `DataLoader`의 `collate_fn` 기능이 필요함.
-        
-        # 🚨 현재는 임시로 첫 번째 샘플의 t 시점 배치만 반환하며, 
-        # 이 함수가 실제 PyG 배칭 로직을 대체한다고 가정합니다.
-        # 실제 PyG 환경에서는 DataLoader를 사용하는 것이 정석입니다.
-        
-        # 📌 임시 방편으로, PyG의 Batch.from_data_list와 유사한 역할을 한다고 가정하고
-        # PyG의 `Batch.from_data_list`를 사용하거나 (외부 임포트 필요)
-        # PyG의 `DataLoader`를 사용하는 것이 정석입니다.
-        
-        # 여기서는 외부 라이브러리 임포트 없이 수동으로 PyG의 Data/Batch 리스트 병합을 시뮬레이션
-        # 🚨 이 부분은 외부 라이브러리 import 없이 정확히 구현하기 어려우므로, 
-        # 실제 환경에서 PyG의 DataLoader를 사용해야 합니다.
-        # 임시로 첫 번째 샘플의 시점 t 데이터를 반환하는 것으로 시뮬레이션합니다.
-        
-        from torch_geometric.data import Batch
-        collated_batch = Batch.from_data_list(batch_list_at_t)
-        collated_batch_list.append(collated_batch)
-        
-    return collated_batch_list
-
 def create_dataloader(dataset, batch_size):
     """
     데이터셋을 지정된 배치 크기로 나누어 리스트로 반환합니다.
@@ -126,6 +84,7 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
     model.eval()
 
     total_loss = 0.0
+    total_eval_samples = 0
     y_true_list = []
     y_pred_list = []
     y_scores_list = []
@@ -145,18 +104,7 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
                     batch_list.append(batch)
             
             # 🚨 [수정 1] .ptr 대신 .batch 속성 사용
-            batch_tensor = batch_list[0].batch
-            diff = torch.diff(batch_tensor)
-            change_indices = torch.where(diff != 0)[0] + 1
-            start_nodes_of_each_graph = torch.cat([
-                torch.tensor([0], device=batch_tensor.device), 
-                change_indices
-            ])
-            
-            # 🚨 [수정 2] 이진 변환 (raw_labels > 0)
-            raw_labels = batch_list[0].y[start_nodes_of_each_graph].long()
-            labels = (raw_labels > 0).long() # (B,)
-            
+            labels = batch_list[0].y
             logits = model.forward(batch_list, template_edge_index)
             
             loss = criterion(logits, labels)
@@ -169,13 +117,16 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
             y_true_list.extend(labels.cpu().tolist())
             y_pred_list.extend(logits.argmax(dim=1).cpu().tolist())
             y_scores_list.extend(score_class_1.cpu().tolist())
+
+            current_batch_size = batch_list[0].batch_size
+            total_loss += loss.item() * current_batch_size
+            total_eval_samples += current_batch_size # ⬅️ 실제 배치 크기 누적
             
     # 평균 손실 계산 수정
     # 🚨 참고: test_dataset[0][0]이 존재하지 않을 수 있으므로, 
     #    평균 배치 크기를 가정하거나, eval 루프 내에서 총 샘플 수를 세는 것이 더 안전합니다.
     #    여기서는 간단히 첫 번째 배치의 크기를 사용합니다.
-    avg_batch_size = test_dataset[0][0].batch_size if total_samples > 0 else 1
-    avg_loss = total_loss / (total_samples * avg_batch_size) 
+    avg_loss = total_loss / total_eval_samples
     
     metrics = compute_metrics(
         y_true_list, 
@@ -185,8 +136,6 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
     )
     return avg_loss, *metrics
 
-# train_A3TGCNCat2 함수 수정
-# train_A3TGCNCat2 함수 수정
 def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_dataset, criterion, optimizer, MODEL_SAVE_PATH, num_epochs=10):
     
     model.train()
@@ -199,10 +148,11 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
     for epoch in tqdm(range(num_epochs), desc="Epochs"):
         model.train()
         train_loss_sum = 0.0
+        total_train_samples = 0
 
         y_true_list, y_pred_list, y_scores_list = [], [], []
 
-        # 🚨 루프 원상 복구: train_dataset을 직접 순회합니다.
+        # 루프 원상 복구: train_dataset을 직접 순회합니다.
         for signal in tqdm(train_dataset, desc=f"Epoch {epoch+1} Training"):
             optimizer.zero_grad()
             
@@ -213,23 +163,11 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
                     batch_list.append(batch.to(device))
                 else:
                     batch_list.append(batch)
+
             
-            # 🚨 레이블 추출 수정 (ptr 대신 batch 속성 사용) 🚨
-            batch_tensor = batch_list[0].batch # (N_total,) e.g., [0,0,1,1,1,2,2,...]
-            
-            # batch 텐서에서 값이 바뀌는 지점(diff != 0)을 찾아 +1 하면
-            # 0번 그래프를 제외한 [1, 2, ..., B-1]번 그래프의 시작 노드 인덱스가 나옵니다.
-            diff = torch.diff(batch_tensor)
-            change_indices = torch.where(diff != 0)[0] + 1
-            
-            # 0번 그래프의 시작 인덱스(0)를 맨 앞에 추가합니다.
-            start_nodes_of_each_graph = torch.cat([
-                torch.tensor([0], device=batch_tensor.device), 
-                change_indices
-            ]) # (B,) e.g., [0, 2, 5, 7, ...]
             
             # 그래프의 시작 노드 인덱스를 사용하여 y 텐서에서 레이블 추출
-            labels = batch_list[0].y[start_nodes_of_each_graph].long() # (B,)
+            labels = batch_list[0].y # (B,)
 
             logits = model.forward(batch_list, template_edge_index)   
             loss = criterion(logits, labels) # (B, 2) vs (B,)
@@ -237,7 +175,7 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
             loss.backward()
             optimizer.step()
 
-            # 🚨 train_loss_sum 누적 방식 수정
+            # train_loss_sum 누적 방식 수정
             train_loss_sum += loss.item() * batch_list[0].batch_size
 
             probabilities = softmax(logits)
@@ -248,8 +186,12 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
             y_pred_list.extend(predicted_class.cpu().tolist())
             y_scores_list.extend(score_class_1.cpu().tolist())
 
-        # 🚨 평균 손실 계산 수정
-        avg_train_loss = train_loss_sum / (len(train_dataset) * train_dataset[0][0].batch_size)
+            current_batch_size = batch_list[0].batch_size
+            train_loss_sum += loss.item() * current_batch_size
+            total_train_samples += current_batch_size # ⬅️ 실제 배치 크기 누적
+
+        # 평균 손실 계산 수정
+        avg_train_loss = train_loss_sum / total_train_samples
 
         train_metrics = compute_metrics(y_true_list, y_pred_list, y_scores_list, num_classes=2)
         train_acc, train_prec, train_rec, train_f1, train_auc = train_metrics
@@ -259,11 +201,12 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
             model, device, template_edge_index, val_dataset, criterion
         )
 
-        should_stop = early_stopper(val_loss)
-        
-        # 🚨 best_validation_loss는 EarlyStopper 객체에서 가져옵니다.
-        if val_loss < early_stopper.best_validation_loss:
-            best_val_loss = val_loss
+        # best_validation_loss는 EarlyStopper 객체에서
+        if val_loss < early_stopper.best_validation_loss - early_stopper.min_delta:
+            print(f"🎉 New best validation loss: {val_loss:.4f}. Saving model...")
+            
+            # best_val_loss 변수 업데이트 (EarlyStopper 내부 값과 동일해짐)
+            best_val_loss = val_loss 
             
             # 모델 저장
             filename = f"best_model_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
@@ -276,6 +219,10 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
                 save_dir=MODEL_SAVE_PATH, # 폴더 경로 사용
                 filename=filename
             )
+
+        # 🚨 [수정] 2. 검증 및 저장 로직이 끝난 후,
+        #    EarlyStopper의 상태를 업데이트합니다.
+        should_stop = early_stopper(val_loss)
         
         # 학습률 로깅
         current_lr = optimizer.param_groups[0]['lr']
@@ -297,7 +244,7 @@ if __name__ == "__main__":
 
     # 데이터 로드
     CURDIR = os.path.dirname(__file__)
-    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi_sampled.pickle')
+    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi.pickle')
     with open(DATA_PATH, 'rb') as f:
         pickle_dataset = pickle.load(f)
         print("pickle_dataset loaded!!")
