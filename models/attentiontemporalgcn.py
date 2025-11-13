@@ -77,11 +77,20 @@ class A3TGCN(torch.nn.Module):
             * **H** (PyTorch Float Tensor): Hidden state matrix for all nodes.
         """
         H_accum = 0
+        H_sequence_outputs = [] 
+        
         probs = torch.nn.functional.softmax(self._attention, dim=0)
+        
+        H_previous = H 
+        
         for period in range(self.periods):
-            H_accum = H_accum + probs[period] * self._base_tgcn(
-                X[:, :, period], edge_index, edge_weight, H
-            )
+            X_current = X[:, :, :, period]
+            H_current = self._base_tgcn(X_current, edge_index, edge_weight, H_previous)
+            H_previous = H_current 
+            H_sequence_outputs.append(probs[period] * H_current)
+
+        H_accum = sum(H_sequence_outputs)
+
         return H_accum
 
 
@@ -155,9 +164,18 @@ class A3TGCN2(torch.nn.Module):
             * **H** (PyTorch Float Tensor): Hidden state matrix for all nodes.
         """
         H_accum = 0
+        H_sequence_outputs = [] 
+        
         probs = torch.nn.functional.softmax(self._attention, dim=0)
+        
+        H_previous = H 
+        
         for period in range(self.periods):
+            X_current = X[:, :, :, period]
+            H_current = self._base_tgcn(X_current, edge_index, edge_weight, H_previous)
+            H_previous = H_current 
+            H_sequence_outputs.append(probs[period] * H_current)
 
-            H_accum = H_accum + probs[period] * self._base_tgcn( X[:, :, :, period], edge_index, edge_weight, H) #([32, 207, 32]
+        H_accum = sum(H_sequence_outputs)
 
         return H_accum
