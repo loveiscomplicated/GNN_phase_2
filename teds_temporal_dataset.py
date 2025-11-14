@@ -1,3 +1,10 @@
+# TODO 배치 단위로 데이터셋 저장하기, 즉 process랑 get 부분을 수정해야 함, 
+# 이거 하기 전에 먼저 shape 어떻게 할 건지 생각하기
+# processed_file_names도 달라져야 할 것
+# 나머지 달라져야 하는 게 뭐가 있는지도 알아보기
+
+
+
 import os
 import pandas as pd
 import numpy as np
@@ -5,25 +12,67 @@ import torch
 from tqdm import tqdm
 from torch_geometric.data import Data, Batch, Dataset
 
-def split_ad_dis_df(df: pd.DataFrame):
-    
-    pass
+from utils.processing_utils import get_ad_dis_col
+from utils.device_set import device_set
 
-def _process(raw_data_path):
+def organize_labels(df: pd.DataFrame):
     '''
-    TedsTemporalDataset.process 내부에서 전처리 과정을 수행하는 함수
+    -9가 있는 변수를 그대로 엔티티 임베딩에 넣으면 이상해짐
+    왜냐하면 엔티티 임베딩 모델은 레이블들이 연속된 정수들의 범위로 있다고 가정하기 때문
+    -9, 1, 2, 3 이렇게 있었다면
+    -9, -8, -7, -6, -5, ~~~ 이런 것으로 가정함
+
+    이렇게 하지 않게 하기 위해서
+    -9, 1, 2, 3를
+    1, 2, 3, 4로 바꿈 (-9 -> 4)
+    '''
+    for col in df.columns:
+        labels = sorted(df[col].unique())
+        if -9 in labels:
+            new_label = labels[-1] + 1
+            df.loc[df[col] == -9, col] = new_label
+    return df
+
+def df_to_tensor(df: pd.DataFrame | pd.Series, dtype=torch.long):
+    df_np = df.to_numpy()
+    return torch.tensor(df_np, dtype=dtype)
+
+def get_graph_Data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.Tensor, los: int, device):
+    '''
     Args:
-        raw_data_path: 원본 데이터가 들어 있는 폴더 경로
+        ad_vector (torch.Tensor): vector by integer location based on ad_tensor, shape of ad_tensor - [num_cases, num_variables]
+        dis_vector (torch.Tensor): vector by integer location based on dis_vector, shape of dis_vector - [num_cases, num_variables]
+        y (torch.Tensor): 1-element vector by integer location based on y_vector, shape of y_vector - [num_cases,]
+        los (int): the los of given case
+        device: gpu or cpu
     '''
-    df = pd.read_csv(raw_data_path)
-    df_np = df[:10].to_numpy()
-    df_tensor_X = torch.tensor(df_np[:, :-1], dtype=torch.long)
-    df_tensor_y = torch.tensor(df_np[:, -1], dtype=torch.long)
+    # padding을 위한 텐서 생성, shape: [max_los(=37) - los, num_nodes(=60)]
+    zero_tensor = torch.zeros((37 - los, 60), dtype=torch.long, device=device)
+
+    # admission을 가지고 los-1 번째 타임스탬프까지 채움
+    timestamps = [ad_vector for _ in range(los - 1)]
+
+    # discharge를 가지고 마지막 타임스템흐를 채움
+    timestamps.append(dis_vector)
+
+    # 리스트로 묶인 타임스탬프들을 텐서로 변환, shape: [los, num_nodes(=60)]
+    timestamps_tensor = torch.stack(timestamps, dim=0)
+
+    # 실제 데이터와 패딩을 합침, shape: [37(=max_los), 60=(num_nodes)] 
+    # 이 shape으로 해야 엔티티 임베딩할 때 37개를 배치 단위로 인식하게 하여 한꺼번에 처리 가능
+    time_padded = torch.concatenate((timestamps_tensor, zero_tensor), dim=0)
+
+    # edge_index=None인 이유는 어차피 모든 데이터에 대해 동일하므로 나중에 따로 들고 있으면 됨
+    # 굳이 모든 객체에 똑같은 걸 넣을 필요는 없음 - 공간 낭비
+    return Data(x=time_padded, edge_index=None, y=y)
     
-    return df_tensor_X, df_tensor_y
 
 class TedsTemporalDataset(Dataset):
     NUM_GRAPH = 1_394_138
+    BATCH_SIZE = 1000
+    device = device_set()
+    
+
     def __init__(self, root):
         '''
         Args:
@@ -31,7 +80,6 @@ class TedsTemporalDataset(Dataset):
             나머지는 안 만져도 됨 
         '''
         super().__init__(root)
-        
     
     @property
     def processed_file_names(self):
@@ -48,28 +96,44 @@ class TedsTemporalDataset(Dataset):
         파일이 하나라도 없거나 폴더가 비어 있으면: process() 메서드를 자동으로 호출
         '''
         print("전처리된 파일이 하나라도 없거나 폴더가 비어 있기 때문에 전처리를 시작합니다...")
+        device = self.device
+        df = pd.read_csv(os.path.join(self.raw_dir, 'missing_corrected.csv'))
+        df = organize_labels(df)
+        ad, dis = get_ad_dis_col(df)
 
-        raw_data_path = os.path.join(self.root, 'raw', 'missing_corrected.csv')
-        X, Y = _process(raw_data_path)
-        # X는 
+        LOS_tensor = df_to_tensor(df['LOS']).to(device)
+        y_tensor = df_to_tensor(df['REASONb']).to(device)
+        ad_tensor = df_to_tensor(df[ad]).to(device)
+        dis_tensor = df_to_tensor(df[dis]).to(device)
 
+        
         for i in tqdm(range(self.NUM_GRAPH), desc='Processing Graphs'):
-            x = X[i, ]
-            y = Y[i]
-            graph = Data(x=x, edge_index=None, y=y)
-            torch.save(graph, os.path.join(self.processed_dir, f'data_{i}.pt')) 
+            graph_Data = get_graph_Data(ad_tensor[i, :], dis_tensor[i, :], y_tensor[i], LOS_tensor[i].item(), device=device)
+            torch.save(graph_Data, os.path.join(self.processed_dir, f'data_{i}.pt'))
             # self.processed_dir를 수동으로 할당할 필요 없이 
             # root에 processed라는 폴더가 있다면 알아서 그 경로를 self.processed_dir로 저장함
             # 만약 root에 processed라는 폴더가 있다면 자동으로 폴더 생성
         
     def get(self, idx):
-        return torch.load(os.path.join(self.processed_dir, f"data_{idx}.pt"))
+        return torch.load(os.path.join(self.processed_dir, f"data_{idx}.pt"), weights_only=False)
         
     def len(self):
         return self.NUM_GRAPH
+
+
+    '''@property
+    def device(self):
+        device = torch.device('cpu')
+
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        elif torch.mps.is_available():
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+            device = torch.device('mps')
+
+        print(f'Using device: {device}')
+        return device'''
     
-
-
 if __name__ == "__main__":
     CURDIR = os.path.dirname(__file__)
     root = os.path.join(CURDIR, 'data_cache')
