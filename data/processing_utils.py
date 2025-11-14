@@ -150,3 +150,33 @@ def get_col_dims(df: pd.DataFrame):
     '''
     col_dims = [len(df[col].cat.categories) for col in df.columns]
     return col_dims
+
+def get_ad_dis_col(df:pd.DataFrame):
+    '''
+    admission 시의 컬럼, discharge 시의 컬럼을 나누어 리턴
+    Args:
+        df(pd.DataFrame): 원본 데이터프레임
+
+    Returns: 
+        (admission 시의 컬럼 list, discharge 시의 컬럼 list)
+    '''
+    cols = list(df.columns)
+
+    if 'LOS' in cols:
+        cols.remove('LOS')
+
+    change = []
+    change_D = []
+
+    for i in cols:
+        if i.endswith('_D'):
+            change_D.append(i)
+            change.append(i[:-2])
+    
+    ad = [i for i in cols if i not in change_D]
+    dis = ad.copy()
+    for i in range(len(ad)):
+        if dis[i] in change:
+            dis[i] = dis[i] + '_D'
+
+    return ad, dis
