@@ -2,6 +2,7 @@
 # 이거 하기 전에 먼저 shape 어떻게 할 건지 생각하기
 # processed_file_names도 달라져야 할 것
 # 나머지 달라져야 하는 게 뭐가 있는지도 알아보기
+# process, processed_file_name, get
 
 
 
@@ -22,15 +23,20 @@ def organize_labels(df: pd.DataFrame):
     -9, 1, 2, 3 이렇게 있었다면
     -9, -8, -7, -6, -5, ~~~ 이런 것으로 가정함
 
-    이렇게 하지 않게 하기 위해서
     -9, 1, 2, 3를
-    1, 2, 3, 4로 바꿈 (-9 -> 4)
+    0, 1, 2, 3으로 바꿈 (-9 -> 4)
+    
+    + CBSA2020
+    이것도 문제가 됨
+    10000 24242 32646 75577 이런 식이라 연속된 정수들의 레이블이 아님
+    10000 24242 32646 75577 -> 1, 2, 3, 4
     '''
+
     for col in df.columns:
         labels = sorted(df[col].unique())
-        if -9 in labels:
-            new_label = labels[-1] + 1
-            df.loc[df[col] == -9, col] = new_label
+        replace_dict = {labels[i]: i for i in range(len(labels))}
+        df[col] = df[col].replace(replace_dict)
+
     return df
 
 def df_to_tensor(df: pd.DataFrame | pd.Series, dtype=torch.long):
@@ -65,11 +71,13 @@ def get_graph_Data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.T
     # edge_index=None인 이유는 어차피 모든 데이터에 대해 동일하므로 나중에 따로 들고 있으면 됨
     # 굳이 모든 객체에 똑같은 걸 넣을 필요는 없음 - 공간 낭비
     return Data(x=time_padded, edge_index=None, y=y)
-    
+
+def get_graph_data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.Tensor, los: int, device):
+    pass
 
 class TedsTemporalDataset(Dataset):
     NUM_GRAPH = 1_394_138
-    BATCH_SIZE = 1000
+    BATCH_SIZE = 10_000
     device = device_set()
     
 
@@ -88,13 +96,15 @@ class TedsTemporalDataset(Dataset):
         로직이 복잡하면서 속성으로 접근하면 좋으니까 @property 사용 
         (메소드를 속성처럼 사용할 수 있게 해줌)
         '''
-        return tuple(f'data_{i}.pt' for i in range(self.NUM_GRAPH))
+        num_files = (self.NUM_GRAPH + self.BATCH_SIZE - 1) // self.BATCH_SIZE
+        return tuple(f'data_{i}.pt' for i in range(num_files))
     
     def process(self):
         '''
         self.root가 비어 있는지 보고 processed_file_names와 파일 이름들을 비교해서 
         파일이 하나라도 없거나 폴더가 비어 있으면: process() 메서드를 자동으로 호출
         '''
+        num_files = (self.NUM_GRAPH + self.BATCH_SIZE - 1) // self.BATCH_SIZE
         print("전처리된 파일이 하나라도 없거나 폴더가 비어 있기 때문에 전처리를 시작합니다...")
         device = self.device
         df = pd.read_csv(os.path.join(self.raw_dir, 'missing_corrected.csv'))
@@ -106,36 +116,39 @@ class TedsTemporalDataset(Dataset):
         ad_tensor = df_to_tensor(df[ad]).to(device)
         dis_tensor = df_to_tensor(df[dis]).to(device)
 
-        
+        data_list = []
+        counter = 0
         for i in tqdm(range(self.NUM_GRAPH), desc='Processing Graphs'):
-            graph_Data = get_graph_Data(ad_tensor[i, :], dis_tensor[i, :], y_tensor[i], LOS_tensor[i].item(), device=device)
-            torch.save(graph_Data, os.path.join(self.processed_dir, f'data_{i}.pt'))
+            graph_Data = get_graph_Data(ad_tensor[i, :], dis_tensor[i, :], y_tensor[i], LOS_tensor[i].item(), device=device)  # type: ignore
+            data_list.append(graph_Data)
+
+            if (i + 1) % self.BATCH_SIZE == 0 or i == self.NUM_GRAPH - 1:
+                save_path = os.path.join(self.processed_dir, f'data_{counter}.pt')
+                torch.save(data_list, save_path)
+                print(f"> data_{counter}.pt saved / total {num_files}s has to be saved...")
+                data_list = []
+                counter += 1
             # self.processed_dir를 수동으로 할당할 필요 없이 
             # root에 processed라는 폴더가 있다면 알아서 그 경로를 self.processed_dir로 저장함
             # 만약 root에 processed라는 폴더가 있다면 자동으로 폴더 생성
         
     def get(self, idx):
-        return torch.load(os.path.join(self.processed_dir, f"data_{idx}.pt"), weights_only=False)
-        
+        file_num = idx // self.BATCH_SIZE
+        data_in_file_idx = idx % self.BATCH_SIZE
+
+        file_path = os.path.join(self.processed_dir, f'data_{file_num}.pt')
+        data_list = torch.load(file_path, weights_only=False)
+
+        data = data_list[data_in_file_idx]
+
+        return data
+            
     def len(self):
         return self.NUM_GRAPH
-
-
-    '''@property
-    def device(self):
-        device = torch.device('cpu')
-
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        elif torch.mps.is_available():
-            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-            device = torch.device('mps')
-
-        print(f'Using device: {device}')
-        return device'''
     
 if __name__ == "__main__":
     CURDIR = os.path.dirname(__file__)
     root = os.path.join(CURDIR, 'data_cache')
     dataset = TedsTemporalDataset(root)
+    
     

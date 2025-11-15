@@ -3,11 +3,12 @@ import pickle
 from tqdm import tqdm
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from models.a3tgcn import A3TGCNCat2
 from utils.device_set import device_set
 from utils.metrics import compute_metrics
 from utils.write_log import enable_dual_output
-
+from utils.early_stopper import EarlyStopper
 # train_eval_a3tgcn.py 파일의 상단 import 부분 아래에 추가
 
 def create_dataloader(dataset, batch_size):
@@ -26,43 +27,21 @@ CUR_DIR = os.path.dirname(__file__)
 DATA_PATH = os.path.join(CUR_DIR, 'data', 'Sampled_temporal_graph_data_fully_connected.pickle')
 enable_dual_output('a3tgcn_1110.txt')
 
-# EarlyStopper 클래스는 그대로 유지합니다.
-class EarlyStopper:
-    def __init__(self, patience=10, min_delta=0.0):
-        # ... (생략) ...
-        self.patience = patience
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_validation_loss = float('inf')
-        self.early_stop = False
-
-    def __call__(self, validation_loss):
-        if validation_loss < self.best_validation_loss - self.min_delta:
-            self.best_validation_loss = validation_loss
-            self.counter = 0
-        elif validation_loss > self.best_validation_loss + self.min_delta:
-            self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-                print(f"🛑 Early stopping triggered after {self.counter} epochs without improvement.")
-        
-        return self.early_stop
-    
-
-def save_checkpoint(epoch, model, optimizer, best_val_loss, save_dir, filename="best_model.pth"):
+def save_checkpoint(epoch, model, optimizer, lr_scheduler, best_val_loss, save_dir, filename="best_model.pth"):
     # ... (함수 내용은 그대로 유지합니다.) ...
     state = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'best_val_loss': best_val_loss,
+        'scheduler_state_dict': lr_scheduler.state_dict(),
+        'best_val_loss': best_val_loss
     }
     filepath = os.path.join(save_dir, filename)
     torch.save(state, filepath)
     print(f"Checkpoint saved to: {filepath}")
 
 
-def load_checkpoint(model, optimizer, filepath):
+def load_checkpoint(model, optimizer, lr_scheduler, filepath):
     # ... (함수 내용은 그대로 유지합니다.) ...
     if not os.path.exists(filepath):
         print(f"Error: Checkpoint file not found at {filepath}")
@@ -71,7 +50,8 @@ def load_checkpoint(model, optimizer, filepath):
     checkpoint = torch.load(filepath)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    
+    lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
     start_epoch = checkpoint['epoch']
     best_val_loss = checkpoint['best_val_loss']
     
@@ -136,7 +116,7 @@ def eval_A3TGCNCat2(model, device, template_edge_index, test_dataset, criterion)
     )
     return avg_loss, *metrics
 
-def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_dataset, criterion, optimizer, MODEL_SAVE_PATH, num_epochs=10):
+def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_dataset, criterion, optimizer, lr_scheduler, MODEL_SAVE_PATH, num_epochs=10):
     
     model.train()
 
@@ -163,8 +143,6 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
                     batch_list.append(batch.to(device))
                 else:
                     batch_list.append(batch)
-
-            
             
             # 그래프의 시작 노드 인덱스를 사용하여 y 텐서에서 레이블 추출
             labels = batch_list[0].y # (B,)
@@ -215,6 +193,7 @@ def train_A3TGCNCat2(model, device, template_edge_index, train_dataset, val_data
                 epoch=epoch + 1,
                 model=model,
                 optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
                 best_val_loss=best_val_loss,
                 save_dir=MODEL_SAVE_PATH, # 폴더 경로 사용
                 filename=filename
@@ -244,7 +223,7 @@ if __name__ == "__main__":
 
     # 데이터 로드
     CURDIR = os.path.dirname(__file__)
-    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi.pickle')
+    DATA_PATH = os.path.join(CURDIR, 'data', 'temporal_graph_data_mi_sampled.pickle')
     with open(DATA_PATH, 'rb') as f:
         pickle_dataset = pickle.load(f)
         print("pickle_dataset loaded!!")
@@ -265,7 +244,7 @@ if __name__ == "__main__":
     model.to(DEVICE)
 
     # 🚨 MODEL_SAVE_PATH를 폴더 경로로 변경하고 생성합니다.
-    MODEL_SAVE_PATH = os.path.join(CUR_DIR, 'a3tgcn_checkpoints') 
+    MODEL_SAVE_PATH = os.path.join(CUR_DIR, 'a3tgcn_sample_checkpoints') 
     os.makedirs(MODEL_SAVE_PATH, exist_ok=True) # 저장 폴더 생성
 
     # 손실 함수 정의
@@ -274,6 +253,7 @@ if __name__ == "__main__":
     # 최적화 알고리즘 정의
     learning_rate = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    lr_scheduler = ReduceLROnPlateau(optimizer=optimizer, mode='min', patience=3)
     
     # train 함수 실행
-    train_A3TGCNCat2(model, DEVICE, template_edge_index, train_dataset, val_dataset, criterion, optimizer, MODEL_SAVE_PATH, num_epochs=100)
+    train_A3TGCNCat2(model, DEVICE, template_edge_index, train_dataset, val_dataset, criterion, optimizer, lr_scheduler, MODEL_SAVE_PATH, num_epochs=100)
