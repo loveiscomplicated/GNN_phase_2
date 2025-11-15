@@ -13,35 +13,9 @@ import torch
 from tqdm import tqdm
 from torch_geometric.data import Data, Dataset
 
-from utils.processing_utils import get_ad_dis_col
+from utils.processing_utils import get_ad_dis_col, organize_labels, df_to_tensor
 from utils.device_set import device_set
 
-def organize_labels(df: pd.DataFrame):
-    '''
-    -9가 있는 변수를 그대로 엔티티 임베딩에 넣으면 이상해짐
-    왜냐하면 엔티티 임베딩 모델은 레이블들이 연속된 정수들의 범위로 있다고 가정하기 때문
-    -9, 1, 2, 3 이렇게 있었다면
-    -9, -8, -7, -6, -5, ~~~ 이런 것으로 가정함
-
-    -9, 1, 2, 3를
-    0, 1, 2, 3으로 바꿈 (-9 -> 4)
-    
-    + CBSA2020
-    이것도 문제가 됨
-    10000 24242 32646 75577 이런 식이라 연속된 정수들의 레이블이 아님
-    10000 24242 32646 75577 -> 1, 2, 3, 4
-    '''
-
-    for col in df.columns:
-        labels = sorted(df[col].unique())
-        replace_dict = {labels[i]: i for i in range(len(labels))}
-        df[col] = df[col].replace(replace_dict)
-
-    return df
-
-def df_to_tensor(df: pd.DataFrame | pd.Series, dtype=torch.long):
-    df_np = df.to_numpy()
-    return torch.tensor(df_np, dtype=dtype)
 
 def get_graph_Data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.Tensor, los: int, device):
     '''
@@ -157,14 +131,6 @@ class TedsTemporalDataset(Dataset):
 
 이 모든 걸 텐서로만 진행할 수 있음 + pyg Data / Batch를 쓰면 기본 알고리즘 때문에 쉐입이 이상해지던가 객체를 생성해서 저장하기 때문에 용량이 더 커짐
 '''
-
-class TEDSTensorDataset()
-
-
-
-
-
-
 
 if __name__ == "__main__":
     CURDIR = os.path.dirname(__file__)
