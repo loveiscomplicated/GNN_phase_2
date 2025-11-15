@@ -171,7 +171,7 @@ class A3TGCN2(torch.nn.Module):
         H_previous = H 
         
         for period in range(self.periods):
-            X_current = X[:, :, :, period]
+            X_current = X[:, :, :, period] # shape: [batch_size, num_nodes, feature_dim]. 이런 식으로 반복문 돌리면 period와 같은 차원은 없어짐(축소)
             H_current = self._base_tgcn(X_current, edge_index, edge_weight, H_previous)
             H_previous = H_current 
             H_sequence_outputs.append(probs[period] * H_current)
