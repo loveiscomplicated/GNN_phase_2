@@ -2,15 +2,75 @@ import torch
 import torch.nn as nn
 import numpy as np
 # from torch_geometric_temporal.signal import StaticGraphTemporalSignalBatch # 사용되지 않으므로 제거
-
 import sys
 import os
 cur_dir = os.path.dirname(__file__)
 parent_dir = os.path.join(cur_dir, '..')
 sys.path.append(parent_dir)
-from torch_geometric.data import Batch # 👈 [추가]
-from .entity_embedding import EntityEmbeddingBatch
-from .attentiontemporalgcn import A3TGCN2
+from torch_geometric.data import Data, Batch # 👈 [추가]
+from .entity_embedding import EntityEmbeddingBatch, EntityEmbedding
+from .attentiontemporalgcn import A3TGCN, A3TGCN2
+
+class A3TGCNCat1(nn.Module):
+    def __init__(self, batch_size, col_list, col_dims, num_layers, hidden_channel):
+        '''
+        Args:
+            col_info(list): [col_dims, col_list]
+                            col_list(list): 데이터에서 나타나는 변수의 순서
+                            col_dims(list): 각 변수 별 범주의 개수, 순서는 col_list를 따라야 함
+            num_layers(int): TGCN 레이어의 개수
+            hidden_channel(int): TGCN의 hidden channel
+        '''
+        super().__init__()
+        self.batch_size = batch_size
+        self.col_dims = col_dims
+        self.col_list = col_list
+        self.num_layers = num_layers
+        self.hidden_channel = hidden_channel
+
+        # EntityEmbedding 레이어 정의
+        self.entity_embedding_layer = EntityEmbedding(col_dims=self.col_dims,
+                                                 col_list=self.col_list)
+        a3tgcn_input_channel = self.entity_embedding_layer.proj_dim
+        self.a3tgcn_layers = nn.ModuleList()
+        
+        # A3TGCN2 레이어 정의
+        a3tgcn_input_layer = A3TGCN2(in_channels=a3tgcn_input_channel,
+                        out_channels=hidden_channel,
+                        periods=37,
+                        batch_size=batch_size)
+        self.a3tgcn_layers.append(a3tgcn_input_layer)        
+
+        for _ in range(num_layers - 1):
+            layer = A3TGCN2(in_channels=hidden_channel,
+                            out_channels=hidden_channel,
+                            periods=37,
+                            batch_size=batch_size)
+            self.a3tgcn_layers.append(layer)
+
+        # 분류기 레이어 정의
+        self.classifier_b = nn.Sequential(
+            nn.Linear(hidden_channel * num_layers, hidden_channel),
+            nn.ReLU(),
+            nn.Linear(hidden_channel, 2)
+        )
+    
+    def forward(self, batch: Batch, template_edge_index: torch.Tensor):
+        '''
+        Args:
+            batch(torch_geometric.data.Data): X, y만 정의되어 있는 Data 객체, 
+            template_edge_index(torch.Tensor): edge_index는 동일하므로 template_edge_index로 한꺼번에 전달
+        '''
+        entity_emb = self.entity_embedding_layer(batch.x) # data.x [batch, num_nodes, num_features, max_time]  # type: ignore
+        self.a3tgcn_layers(entity_emb)
+        pass
+
+
+
+
+
+
+
 
 class A3TGCNCat2(nn.Module):
     def __init__(self, col_dims, col_list, num_layers, hidden_channel, out_channel=2):

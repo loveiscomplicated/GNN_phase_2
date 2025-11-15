@@ -36,17 +36,13 @@ class EntityEmbedding(torch.nn.Module):
             outs.append(out)
         outs_tensor = torch.stack(outs, dim = 1)
         return outs_tensor
-# entity_embedding.py 파일의 EntityEmbeddingBatch.forward 함수 수정
+    
 
 class EntityEmbeddingBatch(EntityEmbedding):
     def forward(self, batch: Batch):
         
         # 1. features 텐서 준비
         features = batch.x.long() # 현재 features.device == cpu (문제의 원인)
-        
-        # 🚨 해결책: features 텐서를 모델 파라미터와 동일한 장치로 명시적으로 이동 🚨
-        # self.embs[0]의 장치를 가져와서 features를 그 장치로 이동시킵니다.
-        # 이렇게 하면 features와 모델 파라미터가 동일한 장치에서 연산됩니다.
         TARGET_DEVICE = self.embs[0].weight.device
         features = features.to(TARGET_DEVICE)
         DEVICE = features.device 
@@ -80,7 +76,16 @@ class EntityEmbeddingBatch(EntityEmbedding):
 
         return outs_tensor
     
-    
+
+class EntityEmbeddingBatch2(EntityEmbedding):
+    def forward(self, batch: Batch):
+        '''
+        Args:
+            batch(torch_geometric.data.Batch): batch instance, shape=[batch_size, num_nodes, 1]
+        '''
+        pass
+
+
 if __name__ == "__main__":
     import pickle
     import os
@@ -90,12 +95,13 @@ if __name__ == "__main__":
     with open(data_path, 'rb') as f:
         pickle_dataset = pickle.load(f)
     
-    batch_indi = pickle_dataset[0][0][0]
+    batch_indi = pickle_dataset[0][0][0].x
+
     
     col_list, col_dim = pickle_dataset[3]
     num_features = len(col_list)
 
-    model = EntityEmbeddingBatch(col_dims=col_dim, col_list=col_list)
+    model = EntityEmbedding(col_dims=col_dim, col_list=col_list)
     
     print("Running forward pass...")
     output = model.forward(batch_indi)
