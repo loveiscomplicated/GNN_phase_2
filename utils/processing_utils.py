@@ -182,3 +182,13 @@ def get_ad_dis_col(df:pd.DataFrame):
             dis[i] = dis[i] + '_D'
 
     return ad, dis
+
+def find_indices(lst, targets):
+    return [lst.index(t) if t in lst else None for t in targets]
+
+def get_ad_dis_index(df: pd.DataFrame):
+    col_list = df.columns
+    ad, dis = get_ad_dis_col(df)
+    ad_col_index = find_indices(col_list, ad)
+    dis_col_index = find_indices(col_list, dis)
+    return ad_col_index, dis_col_index
