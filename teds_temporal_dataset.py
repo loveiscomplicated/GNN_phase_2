@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import torch
 from tqdm import tqdm
-from torch_geometric.data import Data, Batch, Dataset
+from torch_geometric.data import Data, Dataset
 
 from utils.processing_utils import get_ad_dis_col
 from utils.device_set import device_set
@@ -72,8 +72,6 @@ def get_graph_Data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.T
     # 굳이 모든 객체에 똑같은 걸 넣을 필요는 없음 - 공간 낭비
     return Data(x=time_padded, edge_index=None, y=y)
 
-def get_graph_data(ad_vector: torch.Tensor, dis_vector: torch.Tensor, y: torch.Tensor, los: int, device):
-    pass
 
 class TedsTemporalDataset(Dataset):
     NUM_GRAPH = 1_394_138
@@ -146,6 +144,28 @@ class TedsTemporalDataset(Dataset):
     def len(self):
         return self.NUM_GRAPH
     
+
+################################################################################################################################################
+####################################################################################################################################################################################
+####################################################################################################################################################################################
+'''
+결국 pyg Data / Batch를 생성해서 저장 또는 로드할 필요가 없었고, 오히려 불편함, 저장공간 낭비였음
+37개의 타임스탬프를 미리 만들어 저장하는 것은 원본 데이터의 37배에 달하는 용량으로 뻥튀기가 되는 것
+우리는 어차피 필요한 게 1. 입소 시, 2. 퇴소 시, 3. 제로 패딩 이기 때문에
+1,2만 들고 엔티티 임베딩까지 한 뒤에
+모델 입력하기 직전에 시계열 데이터로 변환하면 됨
+
+이 모든 걸 텐서로만 진행할 수 있음 + pyg Data / Batch를 쓰면 기본 알고리즘 때문에 쉐입이 이상해지던가 객체를 생성해서 저장하기 때문에 용량이 더 커짐
+'''
+
+class TEDSTensorDataset()
+
+
+
+
+
+
+
 if __name__ == "__main__":
     CURDIR = os.path.dirname(__file__)
     root = os.path.join(CURDIR, 'data_cache')
