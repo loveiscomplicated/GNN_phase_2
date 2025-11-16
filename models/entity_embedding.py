@@ -40,7 +40,9 @@ class EntityEmbedding(torch.nn.Module):
 
 class EntityEmbeddingBatch(EntityEmbedding):
     def forward(self, batch: Batch):
-        
+        '''
+        using pyg, deprecated
+        '''
         # 1. features 텐서 준비
         features = batch.x.long() # 현재 features.device == cpu (문제의 원인)
         TARGET_DEVICE = self.embs[0].weight.device
@@ -78,32 +80,46 @@ class EntityEmbeddingBatch(EntityEmbedding):
     
 
 class EntityEmbeddingBatch2(EntityEmbedding):
-    def forward(self, batch: Batch):
+    '''
+    for Tensor based process
+    '''
+    def forward(self, batch: torch.Tensor):
         '''
         Args:
-            batch(torch_geometric.data.Batch): batch instance, shape=[batch_size, num_nodes, 1]
+            batch (torch.Tensor): shape: [BATCH_SIZE, num_var(=72)]
         '''
-        pass
+        embedded_list = []
+        for idx, emb_func in enumerate(self.embs):
+            current_input = batch[:, idx] # shape: [BATCH_SIZE]
+            embedded_vec = emb_func(current_input)
+            embedded_list.append(embedded_vec)
+        return torch.stack(embedded_list, dim=1) # shape: [BATCH_SIZE, NUM_VAR, FEATURE_DIM] (=[32, 72, 25])
 
 
 if __name__ == "__main__":
-    import pickle
+    import sys
     import os
-    import torch
-    dir_path = os.path.dirname(__file__)
-    data_path = os.path.join(dir_path, '..', 'data', 'Sampled_temporal_graph_data_fully_connected.pickle')
-    with open(data_path, 'rb') as f:
-        pickle_dataset = pickle.load(f)
+    CURDIR = os.path.dirname(__file__)
+    parent_dir = os.path.join(CURDIR, '..')
+    sys.path.append(parent_dir)
     
-    batch_indi = pickle_dataset[0][0][0].x
+    from teds_tensor_dataset import TEDSTensorDataset
+    from train_eval_a3tgcn_revised import train_test_split_customed
 
-    
-    col_list, col_dim = pickle_dataset[3]
-    num_features = len(col_list)
+    root = os.path.join(parent_dir, 'data_tensor_cache')
+    dataset = TEDSTensorDataset(root)
 
-    model = EntityEmbedding(col_dims=col_dim, col_list=col_list)
+    train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset)
     
-    print("Running forward pass...")
-    output = model.forward(batch_indi)
-    print("Forward pass successful!")
-    print("Output shape:", output.shape)
+    col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
+
+    ee_model = EntityEmbeddingBatch2(col_dims=col_dims,
+                                     col_list=col_list)
+    
+    counter = 0
+
+    for x_batch, y_batch, los in train_dataloader:
+        if counter == 3: break
+
+        out = ee_model.forward(x_batch)
+        counter += 1

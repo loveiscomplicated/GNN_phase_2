@@ -6,3 +6,4 @@ data/iframe_figures
 a3tgcn_checkpoints
 *.csv
 data/knn
+temp.ipynb

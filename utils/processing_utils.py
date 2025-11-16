@@ -144,6 +144,62 @@ def fully_connected_edge_index(num_nodes, self_loops=False):
         edge_index = edge_index[:, mask.reshape(-1)]
     return edge_index
 
+def fully_connected_edge_index_batched(num_nodes, batch_size, self_loops=False):
+    '''
+    batched edge_index는 결국 옆으로 이어붙인 것일 뿐, 즉 shape: [2, sum(num_edges{i})]
+    '''
+    single = fully_connected_edge_index(num_nodes=num_nodes)
+    batch_list = [single for i in range(batch_size)]
+    return torch.concatenate(batch_list, dim=1)
+
+def mi_edge_index(mi_dict_path, top_k=6, return_edge_attr=False):
+    """
+    mi_dict: {col_name: pd.Series} (index=다른 변수명, value=MI, 내림차순 정렬)
+    top_k: 각 src에서 MI 상위 k개로만 유향 엣지(src->dst) 생성
+    return_edge_attr: True면 edge_attr로 MI 가중치 반환
+    """
+
+    import pickle
+    with open(mi_dict_path, 'rb') as f:
+        mi_dict = pickle.load(f)
+
+    cols = list(mi_dict.keys())
+    col_to_idx = {c: i for i, c in enumerate(cols)}
+
+    src_idx, dst_idx, weights = [], [], []
+
+    for src in cols:
+        series = mi_dict[src]
+
+        # 우리 그래프에 존재하는 변수만 남기고, 자기 자신은 제외
+        series = series[series.index.isin(cols)]
+        if src in series.index:
+            series = series.drop(index=src)
+
+        # 상위 k개 선택 (이미 내림차순 정렬되어 있다고 가정)
+        top_neighbors = series.head(top_k)
+
+        for dst, w in top_neighbors.items():
+            src_idx.append(col_to_idx[src])
+            dst_idx.append(col_to_idx[dst])
+            if return_edge_attr:
+                weights.append(float(w))
+
+    edge_index = torch.tensor([src_idx, dst_idx], dtype=torch.long)
+
+    if return_edge_attr:
+        edge_attr = torch.tensor(weights, dtype=torch.float)
+        return edge_index, edge_attr
+
+    return edge_index
+
+def mi_edge_index_batched(batch_size, mi_dict_path, top_k=6, return_edge_attr=False)->torch.Tensor:
+    single = mi_edge_index(mi_dict_path=mi_dict_path, top_k=top_k, return_edge_attr=return_edge_attr)
+    
+    batch_list = [single for _ in range(batch_size)]
+
+    return torch.concatenate(tensors=batch_list, dim=1)
+
 def get_col_dims(df: pd.DataFrame):
     '''
     변수별 범주의 개수 파악

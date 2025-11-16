@@ -84,7 +84,8 @@ class TEDSTensorDataset(Dataset):
         """
         input_tensor = self.processed_tensor[index, :-1]
         y_label = self.processed_tensor[index, -1]
-        return input_tensor, y_label
+        los = self.LOS[index]
+        return input_tensor, y_label, los
     
     def __len__(self):
         """
@@ -119,6 +120,7 @@ class TEDSTensorDataset(Dataset):
         # los 따로 빼기
         if 'LOS' in df.columns:
             LOS = df['LOS']
+            LOS = df_to_tensor(LOS)
             df = df.drop('LOS', axis=1)
         else:
             raise ValueError('raw data에서 LOS 데이터를 찾을 수 없습니다.')
@@ -128,21 +130,25 @@ class TEDSTensorDataset(Dataset):
         
         # label_organize
         df = organize_labels(df)
-        
-        # get col infos, list of (col_list, col_dims, ad_col_index, dis_col_index)
-        col_info = get_col_info(df)
-
         # df to tensor
         df_tensor = df_to_tensor(df)
+        
+        # get col infos, list of (col_list, col_dims, ad_col_index, dis_col_index)
+        # ad_col_index, dis_col_index는 다음과 같음 integer position of admission col, discharge col
+        df = df.drop("REASONb", axis=1)
+        col_info = get_col_info(df)
 
         # processed_data는 (tensor, col_info, LOS)형태 
         # LOS는 pd.Series임
-        # col_info는 다음과 같음 list of integer position of (admission col, discharge col), 각각은 리스트
+        # col_info는 다음과 같음 (col_list, col_dims, ad_col_index, dis_col_index)
         return df_tensor, col_info, LOS # -> self.process하면 tuple로 반환될 것
 
 if __name__ == "__main__":
     root = os.path.join(CURDIR, 'data_tensor_cache')
     dataset = TEDSTensorDataset(root)
     dataloader = DataLoader(dataset, 32, shuffle=True)
+    counter = 0
     for batch in dataloader:
-        print(batch)
+        if counter == 10: break
+        print(batch[-1])
+        counter += 1
