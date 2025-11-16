@@ -95,6 +95,27 @@ class EntityEmbeddingBatch2(EntityEmbedding):
             embedded_list.append(embedded_vec)
         return torch.stack(embedded_list, dim=1) # shape: [BATCH_SIZE, NUM_VAR, FEATURE_DIM] (=[32, 72, 25])
 
+class EntityEmbeddingBatch3(nn.Module):
+    def __init__(self, col_dims, embedding_dim=32):
+        super().__init__()
+        col_dims = torch.as_tensor(col_dims, dtype=torch.long)
+
+        offsets = torch.zeros_like(col_dims)
+        offsets[1:] = torch.cumsum(col_dims[:-1], dim=0) # 누적합 계산
+
+        # 학습 파라미터는 아니지만, 모델과 함께 device를 따라가야 하므로 buffer로 등록
+        self.register_buffer("offsets", offsets)
+        self.register_buffer("col_dims", col_dims)
+
+        total_dim = int(col_dims.sum().item())  # 전체 카테고리 수
+        self.embedding_layer = nn.Embedding(total_dim, embedding_dim)
+
+
+    def forward(self, batch: torch.Tensor): # batch shape: [BATCH_SIZE, NUM_VAR] (=[32, 72])
+        batch = batch.long()
+        glob_batch = batch + self.offsets # type: ignore
+        return self.embedding_layer(glob_batch) # shape: [BATCH_SIZE, NUM_VAR, FEATURE_DIM]
+        
 
 if __name__ == "__main__":
     import sys
@@ -113,8 +134,7 @@ if __name__ == "__main__":
     
     col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
 
-    ee_model = EntityEmbeddingBatch2(col_dims=col_dims,
-                                     col_list=col_list)
+    ee_model = EntityEmbeddingBatch3(col_dims=col_dims, embedding_dim=32)
     
     counter = 0
 

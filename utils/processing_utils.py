@@ -198,7 +198,7 @@ def mi_edge_index_batched(batch_size, mi_dict_path, top_k=6, return_edge_attr=Fa
     
     batch_list = [single for _ in range(batch_size)]
 
-    return torch.concatenate(tensors=batch_list, dim=1)
+    return torch.concatenate(tensors=batch_list, dim=1) # type: ignore
 
 def get_col_dims(df: pd.DataFrame):
     '''
@@ -290,3 +290,10 @@ def organize_labels(df: pd.DataFrame):
 def df_to_tensor(df: pd.DataFrame | pd.Series, dtype=torch.long):
     df_np = df.to_numpy()
     return torch.tensor(df_np, dtype=dtype)
+
+def get_total_dim(df: pd.DataFrame):
+    total_dim = 0
+    for col in df.columns:
+        col_dim = len(df[col].unique())
+        total_dim += col_dim
+    return total_dim
