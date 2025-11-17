@@ -62,7 +62,8 @@ class A3TGCNCat1(nn.Module):
         self.a3tgcn_layer = A3TGCN2(in_channels=a3tgcn_input_channel,
                         out_channels=hidden_channel,
                         periods=37,
-                        batch_size=batch_size)
+                        batch_size=batch_size,
+                        cached=True)
 
         # 분류기 레이어 정의
         self.classifier_b = nn.Sequential(
