@@ -38,7 +38,7 @@ class A3TGCNCat1(nn.Module):
     '''
     tensor 연산 위주로 수행하는 모델
     '''
-    def __init__(self, batch_size, col_list, col_dims, embedding_dim, hidden_channel):
+    def __init__(self, batch_size, col_list, col_dims, embedding_dim, hidden_channel, cached=True):
         '''
         Args:
             col_info(list): [col_dims, col_list]
@@ -63,7 +63,7 @@ class A3TGCNCat1(nn.Module):
                         out_channels=hidden_channel,
                         periods=37,
                         batch_size=batch_size,
-                        cached=True)
+                        cached=cached) # 이거 지이이이이이이이인짜 중요함 이걸 해야 성능이 완전 좋아짐
 
         # 분류기 레이어 정의
         self.classifier_b = nn.Sequential(
