@@ -112,15 +112,18 @@ def save_checkpoint(epoch, model, optimizer, scheduler, best_loss, filename):
 
 if __name__ == "__main__":
     root = './data_tensor_cache'
+    # root = './data_tensor_sampled'
     EPOCH = 100
     scheduler_patience = 10
     early_stopping_patience = 15
-    model_path = os.path.join(root, '/model/best_model.pt')
+    model_path = os.path.join(root, 'model')
+    embedding_dim=32
+    hidden_channel=64 ###이게 좀 걸림 30분씩 늘어남
+
     device = device_set()
-    BATCH_SIZE = 32 ###이게 좀 걸림
-    num_workers= 4
-    embedding_dim=64
-    hidden_channel=64 ###이게 좀 걸림
+
+    BATCH_SIZE = 16 
+    num_workers= 0
 
 
     from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -134,6 +137,9 @@ if __name__ == "__main__":
     model = A3TGCNCat1(batch_size=BATCH_SIZE, col_list=col_list,
                         col_dims=col_dims, embedding_dim=embedding_dim, hidden_channel=hidden_channel)
     model.to(device)
+    print("compiling model...")
+    model = torch.compile(model=model, mode="max-autotune", dynamic=False)
+    print("compile finished")
 
     mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
     edge_index = mi_edge_index_batched(batch_size=BATCH_SIZE,
@@ -166,13 +172,13 @@ if __name__ == "__main__":
             best_val_loss = val_loss
             
             file_name = f"best_model_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
-            
+            full_save_path = os.path.join(model_path, file_name)
             save_checkpoint(epoch + 1, 
                             model, 
                             optimizer, 
                             scheduler, 
                             best_val_loss, 
-                            file_name)
+                            full_save_path)
 
         should_stop = early_stopper(val_loss)
         current_lr = optimizer.param_groups[0]['lr']
