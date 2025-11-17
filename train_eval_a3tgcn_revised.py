@@ -118,11 +118,11 @@ if __name__ == "__main__":
     early_stopping_patience = 15
     model_path = os.path.join(root, 'model')
     embedding_dim=32
-    hidden_channel=64 ###이게 좀 걸림 30분씩 늘어남
+    hidden_channel=32 ###이게 좀 걸림 30분씩 늘어남
 
     device = device_set()
 
-    BATCH_SIZE = 16 
+    BATCH_SIZE = 16
     num_workers= 0
 
 
@@ -135,10 +135,14 @@ if __name__ == "__main__":
     col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
 
     model = A3TGCNCat1(batch_size=BATCH_SIZE, col_list=col_list,
-                        col_dims=col_dims, embedding_dim=embedding_dim, hidden_channel=hidden_channel)
+                        col_dims=col_dims, embedding_dim=embedding_dim, hidden_channel=hidden_channel,
+                        cached=True)
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"총 학습 가능한 파라미터 수: {total_params:,}")
     model.to(device)
+
     print("compiling model...")
-    model = torch.compile(model=model, mode="max-autotune", dynamic=False)
+    model = torch.compile(model=model, mode="reduce-overhead", dynamic=False)
     print("compile finished")
 
     mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
