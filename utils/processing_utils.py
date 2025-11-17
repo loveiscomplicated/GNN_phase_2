@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, random_split
 
 def get_initial_data(random_state=42):
     '''
@@ -297,3 +298,21 @@ def get_total_dim(df: pd.DataFrame):
         col_dim = len(df[col].unique())
         total_dim += col_dim
     return total_dim
+
+
+def train_test_split_customed(dataset, batch_size, ratio=[0.7, 0.15, 0.15], seed=42, num_workers=0):
+
+    train_dataset, val_dataset, test_dataset = random_split(
+        dataset=dataset,
+        lengths=ratio,
+        generator=torch.Generator().manual_seed(seed)
+    )
+
+    print(f"Train Set Size: {len(train_dataset)}")
+    print(f"Test Set Size: {len(test_dataset)}")
+
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return train_dataloader, val_dataloader, test_dataloader

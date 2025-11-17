@@ -5,7 +5,7 @@ import os
 cur_dir = os.path.dirname(__file__)
 parent_dir = os.path.join(cur_dir, '..')
 sys.path.append(parent_dir)
-from .entity_embedding import EntityEmbeddingBatch2
+from .entity_embedding import EntityEmbeddingBatch3
 from .attentiontemporalgcn import A3TGCN2
 
 def _to_temporal(x_sliced: torch.Tensor, # shape: [num_var, feature_dim] (=[72, 25])
@@ -58,13 +58,13 @@ class A3TGCNCat1(nn.Module):
     '''
     tensor 연산 위주로 수행하는 모델
     '''
-    def __init__(self, batch_size, col_list, col_dims, hidden_channel):
+    def __init__(self, batch_size, col_list, col_dims, embedding_dim, hidden_channel):
         '''
         Args:
             col_info(list): [col_dims, col_list]
                             col_list(list): 데이터에서 나타나는 변수의 순서
                             col_dims(list): 각 변수 별 범주의 개수, 순서는 col_list를 따라야 함
-            num_layers(int): TGCN 레이어의 개수
+            embedding_dim(int): 엔티티 임베딩 후의 차원
             hidden_channel(int): TGCN의 hidden channel
         '''
         super().__init__()
@@ -74,11 +74,10 @@ class A3TGCNCat1(nn.Module):
         self.hidden_channel = hidden_channel
 
         # EntityEmbedding 레이어 정의
-        self.entity_embedding_layer = EntityEmbeddingBatch2(col_dims=self.col_dims,
-                                                 col_list=self.col_list)
+        self.entity_embedding_layer = EntityEmbeddingBatch3(col_dims=self.col_dims, embedding_dim=embedding_dim)
         
         # A3TGCN2 레이어 정의
-        a3tgcn_input_channel = self.entity_embedding_layer.proj_dim
+        a3tgcn_input_channel = embedding_dim
 
         self.a3tgcn_layer = A3TGCN2(in_channels=a3tgcn_input_channel,
                         out_channels=hidden_channel,
@@ -120,13 +119,13 @@ if __name__ == "__main__":
     root = os.path.join(parent_dir, 'data_tensor_cache')
     dataset = TEDSTensorDataset(root)
 
-    train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset)
+    train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset, batch_size=32)
     
     col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
 
     BATCH_SIZE = 32
 
     model = A3TGCNCat1(batch_size=BATCH_SIZE, col_list=col_list,
-                       col_dims=col_dims, hidden_channel=32)
+                       col_dims=col_dims, embedding_dim=64, hidden_channel=32)
 
     print(model)

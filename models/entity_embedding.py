@@ -203,7 +203,7 @@ if __name__ == "__main__":
     root = os.path.join(parent_dir, 'data_tensor_cache')
     dataset = TEDSTensorDataset(root)
 
-    train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset)
+    train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset, batch_size=32)
     
     col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
 

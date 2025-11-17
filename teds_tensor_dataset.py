@@ -48,7 +48,6 @@ class TEDSTensorDataset(Dataset):
         """
         super().__init__()
         self.root = root
-
         self.raw_dir = os.path.join(root, "raw")
         if not os.path.exists(self.raw_dir):
             os.mkdir(self.raw_dir)
