@@ -117,8 +117,8 @@ if __name__ == "__main__":
     early_stopping_patience = 15
     model_path = os.path.join(root, '/model/best_model.pt')
     device = device_set()
-    BATCH_SIZE = 64 ###이게 좀 걸림
-    num_workers=10
+    BATCH_SIZE = 32 ###이게 좀 걸림
+    num_workers= 4
     embedding_dim=64
     hidden_channel=64 ###이게 좀 걸림
 

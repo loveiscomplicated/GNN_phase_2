@@ -8,49 +8,29 @@ sys.path.append(parent_dir)
 from .entity_embedding import EntityEmbeddingBatch3
 from .attentiontemporalgcn import A3TGCN2
 
-def _to_temporal(x_sliced: torch.Tensor, # shape: [num_var, feature_dim] (=[72, 25])
-                ad_col_index: list, 
-                dis_col_index: list,
-                los,
-                device):
-    
-    ad_idx_t = torch.tensor(ad_col_index).to(device)
-    dis_idx_t = torch.tensor(dis_col_index).to(device)
-    
-    ad_tensor = torch.index_select(x_sliced, dim=0, index=ad_idx_t)
-    dis_tensor = torch.index_select(x_sliced, dim=0, index=dis_idx_t)
-    
-    tensor_list = [ad_tensor for _ in range(los-1)]
-    tensor_list.append(dis_tensor) # tensor_listtensor_listtensor_listtensor_listtensor_listtensor_list 33333333 33
-    temp_tensor = torch.stack(tensor_list, dim=-1)
-
-    num_nodes = len(ad_col_index)
-    num_features = x_sliced.shape[1] # x_sliced shape: [num_var, feature_dim] (=[72, 25])
-    
-    zero = torch.zeros((num_nodes, num_features, 37-los), device=device) # 37: max los
-
-    return torch.concatenate((temp_tensor, zero), dim=-1)
-
 def to_temporal(x_tensor: torch.Tensor, # shape: [batch_size, num_var, feature_dim] (=[32, 72, 25])
                 ad_col_index: list, 
                 dis_col_index: list,
                 LOS: torch.Tensor,
-                device):
-    batch_size = x_tensor.shape[0]
+                device,
+                max_los=37):
+    batch_size, _, num_features = x_tensor.shape
+    num_nodes = len(ad_col_index)
 
-    temp_list = []
+    ad_idx_t = torch.tensor(ad_col_index, device=device)
+    dis_idx_t = torch.tensor(dis_col_index, device=device)
+
+    ad_tensor = torch.index_select(x_tensor, dim=1, index=ad_idx_t)
+    dis_tensor = torch.index_select(x_tensor, dim=1, index=dis_idx_t)
+
+    # Create a temporal mask based on LOS
+    los_mask = torch.arange(max_los, device=device).unsqueeze(0).unsqueeze(0).unsqueeze(0) < LOS.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+    los_mask = los_mask.expand(batch_size, num_nodes, num_features, max_los)
     
-    for i in range(batch_size):
-        x_sliced = x_tensor[i, :, :]
-        los = LOS[i].item()
-        # temp_tensor shape: [60, 25, 37]
-        temp_tensor = _to_temporal(x_sliced=x_sliced,
-                                   ad_col_index=ad_col_index,
-                                   dis_col_index=dis_col_index,
-                                   los=los,
-                                   device=device)
-        temp_list.append(temp_tensor)
-    return torch.stack(temp_list, dim=0) # shape: [32, 60, 25, 37]
+    # Create the temporal tensor
+    temporal_tensor = torch.where(los_mask, ad_tensor.unsqueeze(-1), dis_tensor.unsqueeze(-1))
+
+    return temporal_tensor
 
 
 
