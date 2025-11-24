@@ -1,0 +1,42 @@
+Train Set Size: 975897
+Test Set Size: 209120
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975897
+Test Set Size: 209120
+🎉 New best validation loss: 0.7702. Saving model...
+
+[Epoch 1/100]
+  [Train] LR: 0.000500 | Loss: 0.7704
+  [Valid] Loss: 0.7702 | Acc: 0.5564, Prec: 0.2782, Rec: 0.5000, F1: 0.3575, AUC: 0.5000
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975897
+Test Set Size: 209120
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975897
+Test Set Size: 209120
+🎉 New best validation loss: 0.7701. Saving model...
+
+[Epoch 1/100]
+  [Train] LR: 0.000500 | Loss: 0.7704
+  [Valid] Loss: 0.7701 | Acc: 0.5564, Prec: 0.2782, Rec: 0.5000, F1: 0.3575, AUC: 0.5000
+
+[Epoch 2/100]
+  [Train] LR: 0.000500 | Loss: 0.7703
+  [Valid] Loss: 0.7702 | Acc: 0.5564, Prec: 0.2782, Rec: 0.5000, F1: 0.3575, AUC: 0.5000
+
+[Epoch 3/100]
+  [Train] LR: 0.000500 | Loss: 0.7703
+  [Valid] Loss: 0.7701 | Acc: 0.5564, Prec: 0.2782, Rec: 0.5000, F1: 0.3575, AUC: 0.5000
+
+[Epoch 4/100]
+  [Train] LR: 0.000500 | Loss: 0.7703
+  [Valid] Loss: 0.7701 | Acc: 0.5564, Prec: 0.2782, Rec: 0.5000, F1: 0.3575, AUC: 0.5000
+
+[Epoch 5/100]
+  [Train] LR: 0.000500 | Loss: 0.7703
+  [Valid] Loss: 0.7701 | Acc: 0.4436, Prec: 0.2218, Rec: 0.5000, F1: 0.3073, AUC: 0.5000
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
