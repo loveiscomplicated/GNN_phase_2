@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import torch
+import pickle
+from torch_geometric.utils import to_undirected
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, random_split
 
@@ -153,53 +155,116 @@ def fully_connected_edge_index_batched(num_nodes, batch_size, self_loops=False):
     batch_list = [single for i in range(batch_size)]
     return torch.concatenate(batch_list, dim=1)
 
-def mi_edge_index(mi_dict_path, top_k=6, return_edge_attr=False):
+
+def mi_edge_index_improved(mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False):
     """
-    mi_dict: {col_name: pd.Series} (index=다른 변수명, value=MI, 내림차순 정렬)
-    top_k: 각 src에서 MI 상위 k개로만 유향 엣지(src->dst) 생성
-    return_edge_attr: True면 edge_attr로 MI 가중치 반환
+    개선된 MI 기반 그래프 생성 함수 (Strategies 1, 2, 3 적용)
+    
+    Args:
+        mi_dict_path (str): 피클 파일 경로
+        top_k (int): 상위 k개 선택
+        threshold (float): [Strategy 2] MI 값이 이보다 작으면 연결하지 않음 (기본값 0.01)
+        pruning_ratio (float): [Strategy 3] In-Degree가 전체 노드 수의 이 비율을 넘으면 하위 엣지 삭제 (기본값 0.5 = 50%)
+        return_edge_attr (bool): 가중치 반환 여부
     """
 
-    import pickle
     with open(mi_dict_path, 'rb') as f:
         mi_dict = pickle.load(f)
 
     cols = list(mi_dict.keys())
+    num_nodes = len(cols)
     col_to_idx = {c: i for i, c in enumerate(cols)}
 
-    src_idx, dst_idx, weights = [], [], []
+    # 임시 저장을 위한 리스트 (source, target, weight)
+    raw_edges = []
 
+    # 1. 초기 유향 엣지 생성 (Threshold & Top-k 적용)
     for src in cols:
         series = mi_dict[src]
 
-        # 우리 그래프에 존재하는 변수만 남기고, 자기 자신은 제외
+        # 유효 변수 필터링 & 자기 자신 제외
         series = series[series.index.isin(cols)]
         if src in series.index:
             series = series.drop(index=src)
 
-        # 상위 k개 선택 (이미 내림차순 정렬되어 있다고 가정)
+        # [Strategy 2] Threshold 적용 (너무 약한 관계 끊기)
+        series = series[series >= threshold]
+
+        # Top-k 선택
         top_neighbors = series.head(top_k)
 
+        src_idx = col_to_idx[src]
         for dst, w in top_neighbors.items():
-            src_idx.append(col_to_idx[src])
-            dst_idx.append(col_to_idx[dst])
-            if return_edge_attr:
-                weights.append(float(w))
+            dst_idx = col_to_idx[dst]
+            raw_edges.append((src_idx, dst_idx, float(w)))
 
-    edge_index = torch.tensor([src_idx, dst_idx], dtype=torch.long)
-
-    if return_edge_attr:
-        edge_attr = torch.tensor(weights, dtype=torch.float)
-        return edge_index, edge_attr
-
-    return edge_index
-
-def mi_edge_index_batched(batch_size, mi_dict_path, top_k=6, return_edge_attr=False)->torch.Tensor:
-    single = mi_edge_index(mi_dict_path=mi_dict_path, top_k=top_k, return_edge_attr=return_edge_attr)
+    # 2. [Strategy 3] 구조적 Pruning (Hub 노드 견제)
+    # Target 노드별로 엣지를 모아서 In-Degree가 너무 높으면 약한 것부터 잘라냅니다.
     
-    batch_list = [single for _ in range(batch_size)]
+    # Target별로 그룹화: {dst_idx: [(src, dst, w), ...]}
+    edges_by_target = {}
+    for edge in raw_edges:
+        dst = edge[1]
+        if dst not in edges_by_target:
+            edges_by_target[dst] = []
+        edges_by_target[dst].append(edge)
+    
+    final_edges = []
+    max_in_degree = int(num_nodes * pruning_ratio) # 허용 가능한 최대 In-Degree (예: 60개 중 30개)
 
-    return torch.concatenate(tensors=batch_list, dim=1) # type: ignore
+    for dst, edges in edges_by_target.items():
+        # 만약 특정 노드(예: STFIPS)로 들어오는 엣지가 너무 많다면?
+        if len(edges) > max_in_degree:
+            # 가중치(MI) 기준 내림차순 정렬 후 상위 N개만 남김
+            edges.sort(key=lambda x: x[2], reverse=True)
+            kept_edges = edges[:max_in_degree]
+            final_edges.extend(kept_edges)
+        else:
+            final_edges.extend(edges)
+
+    # 텐서 변환 준비
+    if not final_edges:
+        print("⚠️ 주의: 조건에 맞는 엣지가 하나도 없습니다. Threshold를 낮추세요.")
+        return torch.empty((2, 0), dtype=torch.long)
+
+    src_list, dst_list, weight_list = zip(*final_edges)
+    
+    # Directed Edge Index 생성
+    edge_index = torch.tensor([src_list, dst_list], dtype=torch.long)
+    edge_attr = torch.tensor(weight_list, dtype=torch.float) if return_edge_attr else None
+
+    # 3. [Strategy 1] 무방향(Undirected) 그래프로 변환
+    # A->B가 있으면 B->A도 생성 (정보 흐름 개선)
+    # to_undirected는 중복된 엣지는 제거하고, 양방향을 보장해줍니다.
+    if return_edge_attr:
+        edge_index, edge_attr = to_undirected(edge_index, edge_attr, num_nodes=num_nodes)
+        return edge_index, edge_attr
+    else:
+        edge_index = to_undirected(edge_index, num_nodes=num_nodes)
+        return edge_index
+
+def mi_edge_index_batched(batch_size, mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False) -> torch.Tensor:
+    """
+    배치 처리를 위한 Wrapper 함수
+    """
+    single = mi_edge_index_improved(
+        mi_dict_path=mi_dict_path, 
+        top_k=top_k, 
+        threshold=threshold, 
+        pruning_ratio=pruning_ratio,
+        return_edge_attr=return_edge_attr
+    )
+    
+    # Edge Attribute 반환 여부에 따라 처리 분기
+    if return_edge_attr:
+        edge_index, edge_attr = single # type: ignore
+        # 배치 사이즈만큼 복제하여 연결 (dim=1: 옆으로 붙임)
+        batched_edge_index = torch.cat([edge_index for _ in range(batch_size)], dim=1)
+        batched_edge_attr = torch.cat([edge_attr for _ in range(batch_size)], dim=0)
+        return batched_edge_index, batched_edge_attr # type: ignore
+    else:
+        batch_list = [single for _ in range(batch_size)]
+        return torch.cat(tensors=batch_list, dim=1) # type: ignore
 
 def get_col_dims(df: pd.DataFrame):
     '''
@@ -316,3 +381,88 @@ def train_test_split_customed(dataset, batch_size, ratio=[0.7, 0.15, 0.15], seed
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_dataloader, val_dataloader, test_dataloader
+
+
+
+
+
+import torch
+from torch_geometric.utils import is_undirected, degree
+import numpy as np
+
+def verify_graph_structure(edge_index, num_nodes, pruning_ratio):
+    print("\n🔍 [Graph Structure Verification Report]")
+    print("=" * 50)
+
+    # 1. 무방향성 체크
+    is_sym = is_undirected(edge_index)
+    print(f"1. 무방향(Undirected) 그래프인가? : {'✅ Yes' if is_sym else '❌ No'}")
+    
+    if not is_sym:
+        print("   -> 경고: to_undirected가 제대로 적용되지 않았습니다.")
+
+    # 2. 허브 노드(Max Degree) 체크
+    # 무방향이므로 in-degree = out-degree
+    deg = degree(edge_index[0], num_nodes=num_nodes)
+    max_deg = deg.max().item()
+    max_deg_node = deg.argmax().item()
+    
+    limit = int(num_nodes * pruning_ratio)
+    
+    print(f"2. 가장 연결이 많은 노드 (Max Degree)")
+    print(f"   - Node Index: {max_deg_node}")
+    print(f"   - Degree: {int(max_deg)} (Limit: {limit})")
+    
+    if max_deg <= limit:
+        print(f"   ✅ Pass: 허브 노드 프루닝이 잘 되었습니다. (Max {int(max_deg)} <= Limit {limit})")
+    else:
+        print(f"   ❌ Fail: 여전히 너무 강력한 허브가 존재합니다.")
+
+    # 3. 고립 노드 체크 (Degree가 0인 노드)
+    # Threshold가 너무 높으면 고립 노드가 생길 수 있음 (괜찮을 수도 있지만 확인 필요)
+    isolated_nodes = (deg == 0).sum().item()
+    print(f"3. 고립된(연결 없는) 노드 개수: {isolated_nodes}개 / 전체 {num_nodes}개")
+    
+    # 4. 전체 밀도 (Density)
+    num_edges = edge_index.shape[1]
+    possible_edges = num_nodes * (num_nodes - 1) # Self-loop 제외 시
+    density = num_edges / possible_edges
+    print(f"4. 그래프 밀도: {density:.4f} (총 엣지 수: {num_edges})")
+    print("=" * 50)
+
+# --- 테스트 실행 예시 ---
+if __name__ == "__main__":
+    # 임시 테스트용 경로 및 설정
+    import os
+    cur_dir = os.path.dirname(__file__)
+    
+    MI_PATH = os.path.join(cur_dir, 'mi_dict.pickle') # 경로 확인 필요
+    TOP_K = 6
+    THRESH = 0.01
+    PRUNING = 0.5
+    
+    # 함수 실행
+    try:
+        # 개선된 함수 호출
+        edge_index = mi_edge_index_improved(
+            mi_dict_path=MI_PATH, 
+            top_k=TOP_K, 
+            threshold=THRESH, 
+            pruning_ratio=PRUNING
+        )
+        
+        # 전체 노드 수는 mi_dict 열어서 확인하거나 대략 72로 가정
+        # (정확히 하려면 mi_dict 로드해서 len(keys) 해야 함)
+        import pickle
+        with open(MI_PATH, 'rb') as f:
+            cols = list(pickle.load(f).keys())
+            NUM_NODES = len(cols)
+
+        # 검증
+        verify_graph_structure(edge_index, NUM_NODES, PRUNING)
+
+    except Exception as e:
+        print(f"테스트 실패: {e}")
+
+
+
