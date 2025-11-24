@@ -75,7 +75,6 @@ class A3TGCNCat1(nn.Module):
     def forward(self, ad_col_index, dis_col_index, x_batch: torch.Tensor, LOS_batch: torch.Tensor, template_edge_index: torch.Tensor, device):
         '''
         Args:
-            batch(torch.Tensor): X, y만 정의되어 있는 Data 객체, 
             template_edge_index(torch.Tensor): edge_index는 동일하므로 template_edge_index로 한꺼번에 전달
         '''
         x_embedded = self.entity_embedding_layer(x_batch)

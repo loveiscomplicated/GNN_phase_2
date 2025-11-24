@@ -28,7 +28,6 @@ DATA_PATH = os.path.join(CUR_DIR, 'data', 'Sampled_temporal_graph_data_fully_con
 enable_dual_output('a3tgcn_1110.txt')
 
 def save_checkpoint(epoch, model, optimizer, lr_scheduler, best_val_loss, save_dir, filename="best_model.pth"):
-    # ... (함수 내용은 그대로 유지합니다.) ...
     state = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
@@ -42,7 +41,6 @@ def save_checkpoint(epoch, model, optimizer, lr_scheduler, best_val_loss, save_d
 
 
 def load_checkpoint(model, optimizer, lr_scheduler, filepath):
-    # ... (함수 내용은 그대로 유지합니다.) ...
     if not os.path.exists(filepath):
         print(f"Error: Checkpoint file not found at {filepath}")
         return None, None, None

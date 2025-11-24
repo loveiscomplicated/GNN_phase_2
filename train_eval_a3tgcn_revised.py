@@ -40,7 +40,7 @@ def train(model, dataloader, criterion, optimizer, edge_index, device):
 
         running_loss += loss.item() * x_batch.size(0)
 
-        epoch_loss = running_loss / len(dataloader.dataset)
+    epoch_loss = running_loss / len(dataloader.dataset)
     return epoch_loss
 
 def evaluate(model, val_dataloader, criterion, device, ad_col_index, dis_col_index, edge_index):
@@ -111,8 +111,8 @@ def save_checkpoint(epoch, model, optimizer, scheduler, best_loss, filename):
 
 
 if __name__ == "__main__":
-    root = './data_tensor_cache'
-    # root = './data_tensor_sampled'
+    # root = './data_tensor_cache'
+    root = './data_tensor_sampled'
     EPOCH = 100
     scheduler_patience = 10
     early_stopping_patience = 15
@@ -186,7 +186,7 @@ if __name__ == "__main__":
 
         should_stop = early_stopper(val_loss)
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"\n[Epoch {epoch+1}/{epoch}]")
+        print(f"\n[Epoch {epoch+1}/{EPOCH}]")
         print(f"  [Train] LR: {current_lr:.6f} | Loss: {train_loss:.4f}")
         print(f"  [Valid] Loss: {val_loss:.4f} | Acc: {val_accuracy:.4f}, Prec: {val_precision:.4f}, Rec: {val_recall:.4f}, F1: {val_f1:.4f}, AUC: {val_auc:.4f}")
         
