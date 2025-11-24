@@ -1,10 +1,11 @@
 import os
 import pandas as pd
+import numpy as np
 import torch
 import pickle
 from torch_geometric.utils import to_undirected
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 
 def get_initial_data(random_state=42):
     '''
@@ -365,7 +366,7 @@ def get_total_dim(df: pd.DataFrame):
     return total_dim
 
 
-def train_test_split_customed(dataset, batch_size, ratio=[0.7, 0.15, 0.15], seed=42, num_workers=0):
+'''def train_test_split_customed(dataset, batch_size, ratio=[0.7, 0.15, 0.15], seed=42, num_workers=0):
 
     train_dataset, val_dataset, test_dataset = random_split(
         dataset=dataset,
@@ -380,9 +381,69 @@ def train_test_split_customed(dataset, batch_size, ratio=[0.7, 0.15, 0.15], seed
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
+    return train_dataloader, val_dataloader, test_dataloader'''
+
+
+
+
+def train_test_split_customed(dataset, batch_size,
+                              ratio=[0.7, 0.15, 0.15],
+                              seed=42,
+                              num_workers=0):
+
+    assert abs(sum(ratio) - 1.0) < 1e-6, "ratio must sum to 1.0"
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    # 전체 인덱스 & 라벨 추출
+    labels = np.array([dataset[i][1] for i in range(len(dataset))])
+    indices = np.arange(len(dataset))
+
+    unique_labels = np.unique(labels)
+
+    train_idx = []
+    val_idx = []
+    test_idx = []
+
+    # --- Stratified Split ---
+    for ul in unique_labels:
+        cls_idx = indices[labels == ul]
+        np.random.shuffle(cls_idx)
+
+        n_total = len(cls_idx)
+        n_train = int(n_total * ratio[0])
+        n_val = int(n_total * ratio[1])
+        # 남은 건 test
+        n_test = n_total - n_train - n_val
+
+        # 분할
+        train_idx.extend(cls_idx[:n_train])
+        val_idx.extend(cls_idx[n_train:n_train + n_val])
+        test_idx.extend(cls_idx[n_train + n_val:])
+
+    # 셔플 (선택)
+    np.random.shuffle(train_idx)
+    np.random.shuffle(val_idx)
+    np.random.shuffle(test_idx)
+
+    # Subset dataset 생성
+    train_dataset = Subset(dataset, train_idx)
+    val_dataset = Subset(dataset, val_idx)
+    test_dataset = Subset(dataset, test_idx)
+
+    print(f"Train Set Size: {len(train_dataset)}")
+    print(f"Valid Set Size: {len(val_dataset)}")
+    print(f"Test Set Size: {len(test_dataset)}")
+
+    # DataLoader 생성
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
+                                  shuffle=True, num_workers=num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size,
+                                shuffle=False, num_workers=num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
+                                 shuffle=False, num_workers=num_workers)
+
     return train_dataloader, val_dataloader, test_dataloader
-
-
 
 
 

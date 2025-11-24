@@ -87,7 +87,7 @@ def to_temporal_gingru(x: torch.Tensor, los_batch: torch.Tensor):
         enforce_sorted=True
     )
 
-    return packed_data # padded_sorted의 디바이스를 따라감
+    return packed_data, sorted_indices # padded_sorted의 디바이스를 따라감
 
 
 def seperate_x(x: torch.Tensor, ad_idx_t, dis_idx_t, device):
@@ -187,7 +187,10 @@ class GinGru(nn.Module):
         # 이때 시간 축 평탄화는 다음과 같이 되어야 함: 1, 2, 1, 2, 1, 2, ...
         # 위와 같이 될 필요는 없음: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
         # 이렇게 되어도 문제는 없다.
-        x_seperated = seperate_x(x=x_embedded, ad_idx_t=self.ad_idx_t, dis_idx_t=self.ad_idx_t, device=device)
+        x_seperated = seperate_x(x=x_embedded, 
+                                 ad_idx_t=self.ad_idx_t, 
+                                 dis_idx_t=self.dis_idx_t, 
+                                 device=device)
 
         # GIN에 입력
         x_after_gin = x_seperated
@@ -199,12 +202,16 @@ class GinGru(nn.Module):
         gin_result = torch.concatenate(sum_pooled, dim=1) # [B*2, F*num_gin_layers]
             
         # [B*2, F*num_gin_layers] --> [B, 37, F*num_gin_layers]
-        temporal_embedding = to_temporal_gingru(x=gin_result, los_batch=LOS_batch)
+        temporal_embedding, sorted_indices = to_temporal_gingru(x=gin_result, los_batch=LOS_batch)
 
         # GRU에 입력
         gru_out, gru_h = self.gru_layer(temporal_embedding)
 
         gru_h = gru_h.squeeze(0)
+
+        # PackedSequence로 만들었기 때문에 (시간 길이 순 정렬) 역정렬해야 함
+        inv_indices = torch.argsort(sorted_indices.to(gru_h.device))
+        gru_h = gru_h[inv_indices]                           
 
         # Classifier에 입력
         classifier_result = self.classifier_b(gru_h)

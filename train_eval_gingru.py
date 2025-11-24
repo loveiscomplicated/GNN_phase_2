@@ -104,6 +104,13 @@ def evaluate(model, val_dataloader, criterion, decision_threshold, device, edge_
     epoch_recall = recall_score(all_targets, all_predictions, average='macro', zero_division=0)
     epoch_f1 = f1_score(all_targets, all_predictions, average='macro', zero_division=0)
 
+    probs = torch.sigmoid(logits)
+    preds = (probs > 0.5).long()
+
+    print("Valid preds label counts:", torch.bincount(preds))
+    print("Valid true label counts:", torch.bincount(y_batch))
+
+
     return epoch_loss, epoch_accuracy, epoch_precision, epoch_recall, epoch_f1, epoch_auc
 
 
@@ -131,7 +138,7 @@ if __name__ == "__main__":
     EPOCH = 100
     scheduler_patience = 10
     early_stopping_patience = 15
-    learning_rate = 0.0005
+    learning_rate = 0.001
 
     sample = False
 
@@ -201,17 +208,34 @@ if __name__ == "__main__":
     print(f"양성 샘플 (1): {n_pos:,} ({n_pos/n_total*100:.2f}%)")
     print(f"계산된 pos_weight: {pos_weight_value:.4f}")
     '''
-    pos_weight_value = 1.2504 # 음성 / 양성 
-    pos_weight_tensor = torch.tensor([pos_weight_value], dtype=torch.float).to(device)
-    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+    # pos_weight_value = 1.2504 # 음성 / 양성 
+    # pos_weight_tensor = torch.tensor([pos_weight_value], dtype=torch.float).to(device)
+    # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     scheduler = ReduceLROnPlateau(optimizer, "min", patience=10)
 
     early_stopper = EarlyStopper(patience=early_stopping_patience)
 
-    
+    with torch.no_grad():
+        batch = next(iter(val_dataloader))
+        x_batch, los_batch, edge_index, y = batch[0], batch[2], edge_index, batch[1]
+
+        logits = model(x_batch, los_batch, edge_index, device)
+        probs = torch.sigmoid(logits)
+
+        print("logits mean/std:", logits.mean().item(), logits.std().item())
+        print("probs min/max/mean:", probs.min().item(), probs.max().item(), probs.mean().item())
+        print("y label mean:", y.float().mean().item())
+
+        pos_mask = (y == 1)
+        neg_mask = (y == 0)
+
+        print("pos logits mean:", logits[pos_mask].mean().item())
+        print("neg logits mean:", logits[neg_mask].mean().item())
+
     for epoch in tqdm(range(EPOCH)):
         train_loss = train(model, train_dataloader, criterion, optimizer, edge_index, device)
 
