@@ -10,3 +10,4 @@ temp.ipynb
 data/knn/data_dum_nan.csv
 data
 data_tensor_cache
+checkpoints/gingru
