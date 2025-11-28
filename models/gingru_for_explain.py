@@ -1,4 +1,3 @@
-
 import os
 import sys
 import torch
@@ -6,38 +5,7 @@ import torch.nn as nn
 from torch_geometric.nn import GINConv
 from torch.nn import GRU
 from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
-
-
-cur_dir = os.path.dirname(__file__)
-parent_dir = os.path.join(cur_dir, '..')
-sys.path.append(parent_dir)
-from .entity_embedding import EntityEmbeddingBatch3
-
-# TODO 이걸 GIN의 아웃풋에 맞게 변형시켜야 함, 지금 이건 엔티티 임베딩 후 바로 적용하게끔 되어 있음
-
-'''def to_temporal(x_tensor: torch.Tensor, # shape: [batch_size, num_var, feature_dim] (ex=[32, 72, 25])
-                ad_col_index: list, 
-                dis_col_index: list,
-                LOS: torch.Tensor,
-                device,
-                max_los=37):
-    batch_size, _, num_features = x_tensor.shape
-    num_nodes = len(ad_col_index)
-
-    ad_idx_t = torch.tensor(ad_col_index, device=device)
-    dis_idx_t = torch.tensor(dis_col_index, device=device)
-
-    ad_tensor = torch.index_select(x_tensor, dim=1, index=ad_idx_t)
-    dis_tensor = torch.index_select(x_tensor, dim=1, index=dis_idx_t)
-
-    # Create a temporal mask based on LOS
-    los_mask = torch.arange(max_los, device=device).unsqueeze(0).unsqueeze(0).unsqueeze(0) < LOS.unsqueeze(1).unsqueeze(1).unsqueeze(1)
-    los_mask = los_mask.expand(batch_size, num_nodes, num_features, max_los)
-    
-    # Create the temporal tensor
-    temporal_tensor = torch.where(los_mask, ad_tensor.unsqueeze(-1), dis_tensor.unsqueeze(-1))
-
-    return temporal_tensor'''
+from models.entity_embedding import EntityEmbeddingBatch3
 
 def get_mask(los_batch: torch.Tensor):
     '''
@@ -92,14 +60,14 @@ def to_temporal_gingru(x: torch.Tensor, los_batch: torch.Tensor):
 
 def seperate_x(x: torch.Tensor, ad_idx_t, dis_idx_t, device):
     
-    ad_tensor = torch.index_select(x, dim=1, index=ad_idx_t) # [B, 60, F]
+    ad_tensor =torch.index_select(x, dim=1, index=ad_idx_t) # [B, 60, F]
     dis_tensor = torch.index_select(x, dim=1, index=dis_idx_t) # [B, 60, F]
 
     return torch.concatenate((ad_tensor, dis_tensor), dim=0) # [B*2, 60, F]
 
 
 
-class GinGru(nn.Module):
+class ExplainerCompatibleGinGru(nn.Module):
     def __init__(self, batch_size, col_list, col_dims, ad_col_index, dis_col_index, embedding_dim, gin_hidden_channel, train_eps, gin_layers, gru_hidden_channel):
         '''
         Args:
@@ -173,39 +141,40 @@ class GinGru(nn.Module):
             nn.Linear(gru_hidden_channel * 2, 1)
         )
 
-    def forward(self, x_batch: torch.Tensor, LOS_batch: torch.Tensor, template_edge_index, device):
+    def forward(self, x_embedded, template_edge_index, **kwargs):
         '''
         template_edge_index: supersized edge_index
+        **kwargs: LOS_batch, device, graph_index
         '''
+        device = kwargs.get("device")
+        LOS_batch = kwargs.get("LOS_batch")
+
+
+        # x_embedded shape: [72, 32]
+        x_embedded = x_embedded.unsqueeze(0)
+        zero_tensor = torch.zeros([31, 72, 32])
+        gin_input = torch.concatenate([x_embedded, zero_tensor], dim=0) # gin_input shape: [32, 72, 32]
+        
+        
         self.ad_idx_t = self.ad_idx_t.to(device)
         self.dis_idx_t = self.dis_idx_t.to(device)
-        
-        batch_size = x_batch.shape[0]
-        num_nodes = len(self.ad_idx_t)
-
-        # x_batch shape: [batch_size, num_var(=72)]
-        x_embedded = self.entity_embedding_layer(x_batch) # shape: [batch, num_var, feature_dim]
 
         # process: [batch * 2, num_nodes, feature_dim]으로 변환하기
         # 이때 시간 축 평탄화는 다음과 같이 되어야 함: 1, 2, 1, 2, 1, 2, ...
         # 위와 같이 될 필요는 없음: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
         # 이렇게 되어도 문제는 없다.
-        x_seperated = seperate_x(x=x_embedded, # [B*2, 60, 32]
+        x_seperated = seperate_x(x=gin_input, 
                                  ad_idx_t=self.ad_idx_t, 
                                  dis_idx_t=self.dis_idx_t, 
                                  device=device)
 
         # GIN에 입력
-        x_flatten = x_seperated.reshape(batch_size * 2 * num_nodes, -1)
-
-        x_after_gin = x_flatten
+        x_after_gin = x_seperated
         sum_pooled = []
         for layer in self.gin_layers:
-            x_after_gin = layer(x_after_gin, template_edge_index) # [B * 2 * N, F(32)]
-            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel) # [B * 2, N, F]
-            x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
+            x_after_gin = layer(x_after_gin, template_edge_index) # [B * 2, N(60), F(32)]
+            x_sum = torch.sum(x_after_gin, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
             sum_pooled.append(x_sum)
-
         gin_result = torch.concatenate(sum_pooled, dim=1) # [B*2, F*num_gin_layers]
             
         # [B*2, F*num_gin_layers] --> [B, 37, F*num_gin_layers]
@@ -217,16 +186,9 @@ class GinGru(nn.Module):
         gru_h = gru_h.squeeze(0)
 
         # PackedSequence로 만들었기 때문에 (시간 길이 순 정렬) 역정렬해야 함
-        inv_indices = torch.argsort(sorted_indices.to(device))
+        inv_indices = torch.argsort(sorted_indices.to(gru_h.device))
         gru_h = gru_h[inv_indices]                           
 
         # Classifier에 입력
-        return self.classifier_b(gru_h)
-
-
-
-
-if __name__ == "__main__":
-    from teds_tensor_dataset import TEDSTensorDataset
-    dataset = TEDSTensorDataset(root=cur_dir)
-    
+        classifier_result = self.classifier_b(gru_h)
+        return classifier_result[0]

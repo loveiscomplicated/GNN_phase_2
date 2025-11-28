@@ -244,29 +244,49 @@ def mi_edge_index_improved(mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=
         edge_index = to_undirected(edge_index, num_nodes=num_nodes)
         return edge_index
 
-def mi_edge_index_batched(batch_size, mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False) -> torch.Tensor:
+def mi_edge_index_batched(batch_size, num_nodes, mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False, edge_attr_single=None):
     """
     배치 처리를 위한 Wrapper 함수
     """
-    single = mi_edge_index_improved(
-        mi_dict_path=mi_dict_path, 
-        top_k=top_k, 
-        threshold=threshold, 
-        pruning_ratio=pruning_ratio,
-        return_edge_attr=return_edge_attr
-    )
-    
-    # Edge Attribute 반환 여부에 따라 처리 분기
-    if return_edge_attr:
-        edge_index, edge_attr = single # type: ignore
-        # 배치 사이즈만큼 복제하여 연결 (dim=1: 옆으로 붙임)
-        batched_edge_index = torch.cat([edge_index for _ in range(batch_size)], dim=1)
-        batched_edge_attr = torch.cat([edge_attr for _ in range(batch_size)], dim=0)
-        return batched_edge_index, batched_edge_attr # type: ignore
-    else:
-        batch_list = [single for _ in range(batch_size)]
-        return torch.cat(tensors=batch_list, dim=1) # type: ignore
+    # 곱하기 2를 하는 이유는 ad, dis를 concat하는 것의 영향으로 x tensor shape: [B * 2 * 60, F]가 될 것
+    batch_size_d = batch_size * 2
 
+    if return_edge_attr:
+        single, edge_attr= mi_edge_index_improved(
+            mi_dict_path=mi_dict_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+    else:
+        single = mi_edge_index_improved(
+            mi_dict_path=mi_dict_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+
+    edge_list = []
+    attr_list = []
+
+    for g in range(batch_size_d):
+        offset = num_nodes * g
+        edge_i = single + offset
+        edge_list.append(edge_i)
+
+        if return_edge_attr:
+            attr_list.append(edge_attr)
+    
+    batched_edge_index = torch.cat(edge_list, dim=1)
+
+    if return_edge_attr:
+        batched_attr_list = torch.cat(attr_list, dim=0)
+        return batched_edge_index, batched_attr_list
+    
+    return batched_edge_index
+    
 def get_col_dims(df: pd.DataFrame):
     '''
     변수별 범주의 개수 파악
@@ -436,12 +456,13 @@ def train_test_split_customed(dataset, batch_size,
     print(f"Test Set Size: {len(test_dataset)}")
 
     # DataLoader 생성
+    # drop_last=True를 해야 마지막 자투리 배치를 위해 따로 배치 엣지 인덱스를 만들 필요가 없음
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size,
-                                  shuffle=True, num_workers=num_workers)
+                                  shuffle=True, num_workers=num_workers, drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size,
-                                shuffle=False, num_workers=num_workers)
+                                shuffle=False, num_workers=num_workers, drop_last=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size,
-                                 shuffle=False, num_workers=num_workers)
+                                 shuffle=False, num_workers=num_workers, drop_last=True)
 
     return train_dataloader, val_dataloader, test_dataloader
 

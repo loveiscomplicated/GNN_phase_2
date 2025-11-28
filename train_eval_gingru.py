@@ -154,12 +154,16 @@ if __name__ == "__main__":
     dataset = TEDSTensorDataset(root)
 
     col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
+
+    num_nodes = len(ad_col_index)
     
     edge_index = mi_edge_index_batched(batch_size=BATCH_SIZE,
                                             mi_dict_path=mi_dict_path,
+                                            num_nodes=num_nodes,
                                             top_k=6,
                                             return_edge_attr=False)
-    edge_index = edge_index.to(device)
+    
+    edge_index = edge_index.to(device) # type: ignore
     
     model = GinGru(batch_size=BATCH_SIZE,
                    col_dims=col_dims,
