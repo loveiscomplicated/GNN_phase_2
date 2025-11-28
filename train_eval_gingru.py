@@ -124,23 +124,6 @@ def save_checkpoint(epoch, model, optimizer, scheduler, best_loss, filename):
     }
     torch.save(checkpoint, filename)
 
-def load_checkpoint(model, optimizer, scheduler, filename, device='cpu'):
-    """
-    저장된 체크포인트를 불러와 model, optimizer, scheduler 상태를 복원한다.
-    반환값: (start_epoch, best_loss)
-    """
-    checkpoint = torch.load(filename, map_location=device)
-
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-
-    start_epoch = checkpoint['epoch'] + 1  # 다음 epoch부터 재시작
-    best_loss = checkpoint['best_loss']
-
-    return start_epoch, best_loss
-
-
 if __name__ == "__main__":
     # device = device_set()
     device = torch.device('cpu')

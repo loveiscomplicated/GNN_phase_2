@@ -1,354 +1,0 @@
-Using device: mps
-Using device: mpsUsing device: mps
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-pickle_dataset loaded!!pickle_dataset loaded!!pickle_dataset loaded!!
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from data/temporal_graph_data_mi_sampled.pickle...Loading data info from data/temporal_graph_data_mi_sampled.pickle...Loading data info from data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth
-
-
-Collecting seaborn
-Collecting seaborn
-Collecting seaborn
-  Downloading seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
-  Downloading seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
-  Downloading seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
-Requirement already satisfied: numpy!=1.24.0,>=1.20 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.5)
-Requirement already satisfied: pandas>=1.2 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.3)
-Requirement already satisfied: numpy!=1.24.0,>=1.20 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.5)
-Requirement already satisfied: pandas>=1.2 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.3)
-Requirement already satisfied: numpy!=1.24.0,>=1.20 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.5)
-Requirement already satisfied: pandas>=1.2 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from seaborn) (2.3.3)
-Collecting matplotlib!=3.6.1,>=3.4 (from seaborn)
-  Downloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl.metadata (11 kB)
-Collecting matplotlib!=3.6.1,>=3.4 (from seaborn)
-  Downloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl.metadata (11 kB)
-Collecting matplotlib!=3.6.1,>=3.4 (from seaborn)
-  Downloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl.metadata (11 kB)
-Collecting contourpy>=1.0.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl.metadata (5.5 kB)
-Collecting cycler>=0.10 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
-Collecting contourpy>=1.0.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl.metadata (5.5 kB)
-Collecting cycler>=0.10 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
-Collecting contourpy>=1.0.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl.metadata (5.5 kB)
-Collecting cycler>=0.10 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
-Collecting fonttools>=4.22.0 (from matplotlib!=3.6.1,>=3.4->seaborn)
-Collecting fonttools>=4.22.0 (from matplotlib!=3.6.1,>=3.4->seaborn)
-Collecting fonttools>=4.22.0 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl.metadata (112 kB)
-  Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl.metadata (112 kB)
-  Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl.metadata (112 kB)
-Collecting kiwisolver>=1.3.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl.metadata (6.3 kB)
-Requirement already satisfied: packaging>=20.0 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (25.0)
-Collecting kiwisolver>=1.3.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl.metadata (6.3 kB)
-Requirement already satisfied: packaging>=20.0 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (25.0)
-Collecting kiwisolver>=1.3.1 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Downloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl.metadata (6.3 kB)
-Requirement already satisfied: packaging>=20.0 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (25.0)
-Collecting pillow>=8 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl.metadata (8.8 kB)
-Requirement already satisfied: pyparsing>=3 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (3.2.5)
-Requirement already satisfied: python-dateutil>=2.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (2.9.0.post0)
-Requirement already satisfied: pytz>=2020.1 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: tzdata>=2022.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: six>=1.5 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib!=3.6.1,>=3.4->seaborn) (1.17.0)
-Downloading seaborn-0.13.2-py3-none-any.whl (294 kB)
-Collecting pillow>=8 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl.metadata (8.8 kB)
-Requirement already satisfied: pyparsing>=3 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (3.2.5)
-Requirement already satisfied: python-dateutil>=2.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (2.9.0.post0)
-Requirement already satisfied: pytz>=2020.1 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: tzdata>=2022.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: six>=1.5 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib!=3.6.1,>=3.4->seaborn) (1.17.0)
-Downloading seaborn-0.13.2-py3-none-any.whl (294 kB)
-Collecting pillow>=8 (from matplotlib!=3.6.1,>=3.4->seaborn)
-  Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl.metadata (8.8 kB)
-Requirement already satisfied: pyparsing>=3 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (3.2.5)
-Requirement already satisfied: python-dateutil>=2.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn) (2.9.0.post0)
-Requirement already satisfied: pytz>=2020.1 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: tzdata>=2022.7 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from pandas>=1.2->seaborn) (2025.2)
-Requirement already satisfied: six>=1.5 in /opt/miniconda3/envs/pyg_2/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib!=3.6.1,>=3.4->seaborn) (1.17.0)
-Downloading seaborn-0.13.2-py3-none-any.whl (294 kB)
-Downloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl (8.1 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/8.1 MB[0m [31m?[0m eta [36m-:--:--[0mDownloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl (8.1 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/8.1 MB[0m [31m?[0m eta [36m-:--:--[0mDownloading matplotlib-3.10.7-cp312-cp312-macosx_11_0_arm64.whl (8.1 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/8.1 MB[0m [31m?[0m eta [36m-:--:--[0m[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━[0m [32m6.0/8.1 MB[0m [31m29.9 MB/s[0m eta [36m0:00:01[0m[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━[0m [32m6.0/8.1 MB[0m [31m29.9 MB/s[0m eta [36m0:00:01[0m[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━[0m [32m6.0/8.1 MB[0m [31m29.9 MB/s[0m eta [36m0:00:01[0m[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m8.1/8.1 MB[0m [31m28.2 MB/s[0m  [33m0:00:00[0m
-[?25hDownloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl (273 kB)
-[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m8.1/8.1 MB[0m [31m28.2 MB/s[0m  [33m0:00:00[0m
-[?25hDownloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl (273 kB)
-[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m8.1/8.1 MB[0m [31m28.2 MB/s[0m  [33m0:00:00[0m
-[?25hDownloading contourpy-1.3.3-cp312-cp312-macosx_11_0_arm64.whl (273 kB)
-Using cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
-Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl (2.8 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/2.8 MB[0m [31m?[0m eta [36m-:--:--[0mUsing cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
-Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl (2.8 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/2.8 MB[0m [31m?[0m eta [36m-:--:--[0mUsing cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
-Downloading fonttools-4.60.1-cp312-cp312-macosx_10_13_universal2.whl (2.8 MB)
-[?25l   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m0.0/2.8 MB[0m [31m?[0m eta [36m-:--:--[0m[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2.8/2.8 MB[0m [31m29.5 MB/s[0m  [33m0:00:00[0m
-[?25h[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2.8/2.8 MB[0m [31m29.5 MB/s[0m  [33m0:00:00[0m
-[?25h[2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2.8/2.8 MB[0m [31m29.5 MB/s[0m  [33m0:00:00[0m
-[?25hDownloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl (64 kB)
-Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl (4.7 MB)
-Downloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl (64 kB)
-Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl (4.7 MB)
-Downloading kiwisolver-1.4.9-cp312-cp312-macosx_11_0_arm64.whl (64 kB)
-Using cached pillow-12.0.0-cp312-cp312-macosx_11_0_arm64.whl (4.7 MB)
-Installing collected packages: pillow, kiwisolver, fonttools, cycler, contourpy, matplotlib, seaborn
-[?25lInstalling collected packages: pillow, kiwisolver, fonttools, cycler, contourpy, matplotlib, seaborn
-[?25lInstalling collected packages: pillow, kiwisolver, fonttools, cycler, contourpy, matplotlib, seaborn
-[?25l[2K   [91m━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m1/7[0m [kiwisolver][2K   [91m━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m1/7[0m [kiwisolver][2K   [91m━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m1/7[0m [kiwisolver][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m2/7[0m [fonttools][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[91m╸[0m[90m━━━━━━━━━━━[0m [32m5/7[0m [matplotlib][2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━[0m [32m6/7[0m [seaborn][2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m7/7[0m [seaborn]
-[?25h[1A[2KSuccessfully installed contourpy-1.3.3 cycler-0.12.1 fonttools-4.60.1 kiwisolver-1.4.9 matplotlib-3.10.7 pillow-12.0.0 seaborn-0.13.2
-[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━[0m [32m6/7[0m [seaborn][2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m7/7[0m [seaborn]
-[?25h[1A[2KSuccessfully installed contourpy-1.3.3 cycler-0.12.1 fonttools-4.60.1 kiwisolver-1.4.9 matplotlib-3.10.7 pillow-12.0.0 seaborn-0.13.2
-[2K   [91m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m[90m╺[0m[90m━━━━━[0m [32m6/7[0m [seaborn][2K   [90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m7/7[0m [seaborn]
-[?25h[1A[2KSuccessfully installed contourpy-1.3.3 cycler-0.12.1 fonttools-4.60.1 kiwisolver-1.4.9 matplotlib-3.10.7 pillow-12.0.0 seaborn-0.13.2
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from data/temporal_graph_data_mi_sampled.pickle...Loading data info from data/temporal_graph_data_mi_sampled.pickle...Loading data info from data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth오류 발생: 체크포인트 파일이 없습니다: a3tgcn_sample_checkpoints/best_model_epoch_10_loss_0.1234.pth
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle데이터 파일을 찾을 수 없습니다: /Users/jeong-yunseong/Documents/programming/data/temporal_graph_data_mi_sampled.pickle
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-
-
-가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0
-
-
-GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-
-
-가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0
-
-
-GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-
-
-가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0
-
-
-GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...Loading data info from /Users/jeong-yunseong/Documents/programming/Phase_2/data/temporal_graph_data_mi_sampled.pickle...
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-Using device: mpsUsing device: mpsUsing device: mps
-
-
-
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-❌ 초기화 실패: 체크포인트 파일이 없습니다: /Users/jeong-yunseong/Documents/programming/Phase_2/a3tgcn_sample_checkpoints/best_model.pth
-
-
-
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-✅ 모델 로드 및 Explainer 준비 완료. 다음 셀로 이동하세요.
-
-
-가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0가장 중요한 타임스텝(Lookback): 0
-
-
-GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0GNNExplainer 실행: Time=0, Node=0
-
-
