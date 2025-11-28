@@ -187,9 +187,7 @@ class GinGru(nn.Module):
         x_embedded = self.entity_embedding_layer(x_batch) # shape: [batch, num_var, feature_dim]
 
         # process: [batch * 2, num_nodes, feature_dim]으로 변환하기
-        # 이때 시간 축 평탄화는 다음과 같이 되어야 함: 1, 2, 1, 2, 1, 2, ...
-        # 위와 같이 될 필요는 없음: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
-        # 이렇게 되어도 문제는 없다.
+        # 위와 같이 되어야 함: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
         x_seperated = seperate_x(x=x_embedded, # [B*2, 60, 32]
                                  ad_idx_t=self.ad_idx_t, 
                                  dis_idx_t=self.dis_idx_t, 

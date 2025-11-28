@@ -1,3 +1,4 @@
+# gingru_for_explain.py
 import os
 import sys
 import torch
@@ -5,7 +6,38 @@ import torch.nn as nn
 from torch_geometric.nn import GINConv
 from torch.nn import GRU
 from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence
-from models.entity_embedding import EntityEmbeddingBatch3
+
+
+cur_dir = os.path.dirname(__file__)
+parent_dir = os.path.join(cur_dir, '..')
+sys.path.append(parent_dir)
+from .entity_embedding import EntityEmbeddingBatch3
+
+# TODO 이걸 GIN의 아웃풋에 맞게 변형시켜야 함, 지금 이건 엔티티 임베딩 후 바로 적용하게끔 되어 있음
+
+'''def to_temporal(x_tensor: torch.Tensor, # shape: [batch_size, num_var, feature_dim] (ex=[32, 72, 25])
+                ad_col_index: list, 
+                dis_col_index: list,
+                LOS: torch.Tensor,
+                device,
+                max_los=37):
+    batch_size, _, num_features = x_tensor.shape
+    num_nodes = len(ad_col_index)
+
+    ad_idx_t = torch.tensor(ad_col_index, device=device)
+    dis_idx_t = torch.tensor(dis_col_index, device=device)
+
+    ad_tensor = torch.index_select(x_tensor, dim=1, index=ad_idx_t)
+    dis_tensor = torch.index_select(x_tensor, dim=1, index=dis_idx_t)
+
+    # Create a temporal mask based on LOS
+    los_mask = torch.arange(max_los, device=device).unsqueeze(0).unsqueeze(0).unsqueeze(0) < LOS.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+    los_mask = los_mask.expand(batch_size, num_nodes, num_features, max_los)
+    
+    # Create the temporal tensor
+    temporal_tensor = torch.where(los_mask, ad_tensor.unsqueeze(-1), dis_tensor.unsqueeze(-1))
+
+    return temporal_tensor'''
 
 def get_mask(los_batch: torch.Tensor):
     '''
@@ -60,14 +92,14 @@ def to_temporal_gingru(x: torch.Tensor, los_batch: torch.Tensor):
 
 def seperate_x(x: torch.Tensor, ad_idx_t, dis_idx_t, device):
     
-    ad_tensor =torch.index_select(x, dim=1, index=ad_idx_t) # [B, 60, F]
+    ad_tensor = torch.index_select(x, dim=1, index=ad_idx_t) # [B, 60, F]
     dis_tensor = torch.index_select(x, dim=1, index=dis_idx_t) # [B, 60, F]
 
     return torch.concatenate((ad_tensor, dis_tensor), dim=0) # [B*2, 60, F]
 
 
 
-class ExplainerCompatibleGinGru(nn.Module):
+class GinGru(nn.Module):
     def __init__(self, batch_size, col_list, col_dims, ad_col_index, dis_col_index, embedding_dim, gin_hidden_channel, train_eps, gin_layers, gru_hidden_channel):
         '''
         Args:
@@ -141,40 +173,214 @@ class ExplainerCompatibleGinGru(nn.Module):
             nn.Linear(gru_hidden_channel * 2, 1)
         )
 
-    def forward(self, x_embedded, template_edge_index, **kwargs):
-        '''
-        template_edge_index: supersized edge_index
-        **kwargs: LOS_batch, device, graph_index
-        '''
-        device = kwargs.get("device")
-        LOS_batch = kwargs.get("LOS_batch")
+    def forward(self, x_embedded: torch.Tensor, single_edge_index, **kwargs):
+        """ GNNExplainer의 입력을 위한 단일 케이스 포워드 함수
+        달라진 점:
+        0. x_embedded: 엔티티 임베딩이 끝난 x 텐서, 그 이유는 GNNExplainer는 GNN에 바로 인풋이 들어갈 것을 가정하고 돌아가기 때문ㅇ
+                       x_embedded 이건 model.entity_embedding_layer(x)를 통해 따로 구해야 한다.
 
+        1. **kwargs: GNNExplainer를 씌워서 포워드를 하는 경우, (x, edge_index, **kwargs) 형식으로만 인수를 구성해야 한다.
+           즉, 추가적으로 더 입력해야 하는 것은 모두 **kwargs로 묶어야 한다.
 
-        # x_embedded shape: [72, 32]
-        x_embedded = x_embedded.unsqueeze(0)
-        zero_tensor = torch.zeros([31, 72, 32])
-        gin_input = torch.concatenate([x_embedded, zero_tensor], dim=0) # gin_input shape: [32, 72, 32]
+        2. graph_index: 모델 자체의 포워드 계산은 변경된 것이 없다. 단지 마지막 로짓 값에 인덱싱을 해서 특정 단일 케이스의 결과만 도출한 것        
+        single_edge_index: 단일 케이스 엣지 인덱스. 포워드 함수 내에서 graph_index를 통해 offset을 더해줘야 내가 원하는 케이스의 그래프에 엣지가 생성됨
         
+        Args:
+            x_embedded
+            LOS_batch
+            graph_index
+            device
+
+            작성하신 `gingru_for_explain.py`의 의도와 주석을 꼼꼼히 검토했습니다.
+
+**결론부터 말씀드리면, 접근 방향(임베딩 이후 단계 설명, kwargs 활용)은 아주 좋습니다.** 하지만 `GinGru` 모델의 특성(Ad/Dis 두 개의 그래프가 하나로 합쳐져서 돌아가는 구조) 때문에 **`single_edge_index`와 `graph_index`를 처리하는 논리에 결정적인 수정이 필요합니다.**
+
+현재 주석의 논리적 오류와 이를 해결한 수정 코드를 설명해 드리겠습니다.
+
+-----
+
+### 🧐 주석 및 논리 검토
+
+#### 1\. `x_embedded` 입력 (Valid ✅)
+
+> "GNNExplainer는 GNN에 바로 인풋이 들어갈 것을 가정하고 돌아가기 때문"
+
+**정확합니다.** GNNExplainer는 입력 피처(`x`)에 마스크(0\~1 사이의 실수)를 씌워 학습합니다. 만약 임베딩 전의 정수(범주형 인덱스)를 넣으면 마스킹 연산 자체가 불가능하므로, **임베딩이 완료된 연속형 벡터**를 입력으로 주는 것이 맞습니다.
+
+#### 2\. `**kwargs` 사용 (Valid ✅)
+
+> "(x, edge\_index, \*\*kwargs) 형식으로만 인수를 구성해야 한다."
+
+**정확합니다.** PyTorch Geometric의 `Explainer` 클래스들은 모델의 `forward` 서명을 엄격하게 따지므로, 필수 요소 외에는 `**kwargs`로 받아 처리해야 합니다.
+
+#### 3\. `single_edge_index`와 `graph_index` (Critical Fix 🚨)
+
+> "마지막 로짓 값에 인덱싱을 해서 특정 단일 케이스의 결과만 도출... offset을 더해줘야 내가 원하는 케이스의 그래프에 엣지가 생성됨"
+
+**여기가 문제입니다.**
+GNNExplainer는 **입력된 `x`의 크기**와 **`edge_index`의 노드 인덱스 범위**가 일치한다고 가정합니다.
+
+  * **현재 의도:** 전체 배치(예: 32명) 데이터를 `x`에 넣고, `edge_index`는 1명분만 넣어서 특정 인덱스(`graph_index`)만 설명하겠다.
+  * **발생할 문제:**
+      * `x`는 32명분(약 1920개 노드)인데, `edge_index`가 0\~59번 노드만 가리키고 있으면, GNN 연산 자체는 돌아갈 수 있으나 \*\*나머지 31명의 데이터는 엣지가 없는 고립 노드(Isolated Nodes)\*\*로 처리됩니다.
+      * 더 큰 문제는 `seperate_x`와 `reshape` 로직입니다. 이 함수들은 `batch_size`에 의존하여 데이터를 자르고 붙입니다. 배치 전체를 넣고 엣지만 하나를 넣으면 내부 차원 계산이 꼬일 가능성이 매우 높습니다.
+
+**[해결책]**
+Explainer를 돌릴 때는 \*\*"설명하고 싶은 딱 1명의 데이터(Batch Size=1)"\*\*만 모델에 넣어주는 것이 정석입니다.
+즉, `forward` 내부에서 인덱싱을 하는 게 아니라, **입력하기 전에 데이터를 1명분으로 잘라서** 넣어줘야 합니다.
+
+-----
+
+### 🛠️ 수정된 `gingru_for_explain.py`
+
+설명하려는 대상이 \*\*"한 명의 환자(Patient)"\*\*라면, 이 환자는 내부적으로 \*\*Ad 그래프 + Dis 그래프 (총 2개)\*\*를 가집니다. 따라서 `single_edge_index`도 사실상 2개의 그래프를 포함해야 합니다.
+
+```python
+    def forward(self, x_embedded: torch.Tensor, edge_index: torch.Tensor, **kwargs):
+        """
+        GNNExplainer용 Forward 함수
         
+        가정:
+        1. 입력 x_embedded는 [1, Num_Nodes, Hidden] 또는 [1 * 2, Num_Nodes, Hidden]이 아니라
+           기존 배치 처리 로직을 따르기 위해 [1(Batch), 60(Nodes), Embed_Dim] 형태여야 함.
+           (단, 내부 로직에 따라 shape이 다를 수 있으니 아래 코드 참고)
+           
+        2. 설명하고자 하는 대상은 '단일 샘플(Batch=1)'이라고 가정함.
+           따라서 x_embedded에는 딱 1명분의 데이터만 들어와야 함.
+        """
+        
+        # 1. 필수 인자 추출 (kwargs에서)
+        # GNNExplainer는 forward(x, edge_index, **kwargs)로 호출하므로
+        # LOS, device 등은 kwargs에서 꺼내 써야 함.
+        los_batch = kwargs.get('los_batch')
+        device = kwargs.get('device')
+        
+        if los_batch is None or device is None:
+             raise ValueError("GNNExplainer forward requires 'los_batch' and 'device' in kwargs.")
+
+        # 2. 배치 사이즈 계산
+        # Explainer에는 1명분만 넣는 것이 원칙이므로 batch_size는 1이어야 함
+        batch_size = x_embedded.shape[0] 
+        
+        # 참고: x_embedded가 [Batch, Nodes, Dim] 형태라면 batch_size는 1
+        num_nodes = len(self.ad_idx_t)
+
         self.ad_idx_t = self.ad_idx_t.to(device)
         self.dis_idx_t = self.dis_idx_t.to(device)
 
+        # 3. Seperate X (Ad/Dis 분리 및 결합)
+        # x_embedded: [1, 60, Dim] -> x_seperated: [2, 60, Dim] (Ad 1개, Dis 1개)
+        x_seperated = seperate_x(x=x_embedded, 
+                                 ad_idx_t=self.ad_idx_t, 
+                                 dis_idx_t=self.dis_idx_t, 
+                                 device=device)
+
+        # 4. Flatten for GIN
+        # GIN에 들어갈 때는 [Nodes_Total, Dim] 형태여야 함
+        # Nodes_Total = 1(Batch) * 2(Ad/Dis) * 60(Nodes) = 120
+        x_flatten = x_seperated.reshape(batch_size * 2 * num_nodes, -1)
+
+        # ---------------------------------------------------------
+        # [중요] Edge Index 처리
+        # GNNExplainer가 넘겨준 edge_index는 마스킹 등 조작이 가해질 수 있음.
+        # 이 edge_index는 Ad(0~59)와 Dis(60~119)를 모두 포함하고 있어야 함.
+        # ---------------------------------------------------------
+        
+        x_after_gin = x_flatten
+        sum_pooled = []
+        
+        for layer in self.gin_layers:
+            # GNNExplainer가 주입한 edge_index 사용
+            x_after_gin = layer(x_after_gin, edge_index) 
+            
+            # Pooling을 위해 다시 [Batch*2, Node, Dim]으로 복구
+            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel)
+            x_sum = torch.sum(x_graph, dim=1)
+            sum_pooled.append(x_sum)
+
+        gin_result = torch.concatenate(sum_pooled, dim=1) # [2, F_all]
+            
+        # 5. Temporal & GRU & Classifier
+        temporal_embedding, sorted_indices = to_temporal_gingru(x=gin_result, los_batch=los_batch)
+
+        gru_out, gru_h = self.gru_layer(temporal_embedding)
+        gru_h = gru_h.squeeze(0) # [1, Hidden]
+
+        # 정렬 복구
+        inv_indices = torch.argsort(sorted_indices.to(device))
+        gru_h = gru_h[inv_indices]                           
+
+        out = self.classifier_b(gru_h)
+        
+        return out
+```
+
+### 💡 핵심 변경 사항 요약
+
+1.  **`graph_index` 제거:** `forward` 안에서 전체 배치를 받아 인덱싱하지 마세요. 대신 **`Explainer`를 호출하기 전에 데이터를 1개로 잘라서** 넘겨주세요. 그래야 `edge_index`가 꼬이지 않습니다.
+2.  **`single_edge_index` -\> `edge_index`:** GNNExplainer는 변수명을 `edge_index`로 고정해서 넘겨줍니다. 이름을 맞추는 게 좋습니다.
+      * 이때 넘겨주는 `edge_index`는 \*\*Ad 그래프(0\~59)\*\*와 \*\*Dis 그래프(60\~119)\*\*가 합쳐진 형태여야 합니다. (기존 `mi_edge_index_batched` 함수에서 `batch_size=2`로 생성하면 됩니다.)
+3.  **데이터 형태:** 입력 `x_embedded`는 `[1, 60, Dim]` 형태여야 합니다.
+
+### 🚀 사용 예시 (User Code)
+
+```python
+# 설명하려는 대상 (예: 10번째 데이터)
+target_idx = 10
+x_target = x_batch[target_idx].unsqueeze(0) # [1, 60, Dim] (Embedding 전이면 Embedding 통과시켜야 함)
+los_target = los_batch[target_idx].unsqueeze(0) # [1]
+
+# 중요: 1명분(Ad+Dis)에 해당하는 Edge Index 생성
+# 배치사이즈 2를 넣어야 Ad(1) + Dis(1) = 2개 그래프용 인덱스가 나옴
+edge_index_target = mi_edge_index_batched(batch_size=2, ...).to(device)
+
+# 임베딩 통과 (Explainer 입력용)
+x_embedded_target = model.entity_embedding_layer(x_target)
+
+# Explainer 실행
+explainer = GNNExplainer(model, epochs=200, return_type='prob', ...)
+node_feat_mask, edge_mask = explainer.explain_graph(
+    x_embedded=x_embedded_target, # 1명분 데이터
+    edge_index=edge_index_target, # 1명분(Ad+Dis) 엣지
+    los_batch=los_target,         # kwargs로 전달
+    device=device                 # kwargs로 전달
+)
+```
+
+이 방식이 GNNExplainer의 작동 원리와 `GinGru` 구조의 충돌을 막는 가장 깔끔한 방법입니다.
+        """
+
+        LOS_batch = kwargs.get("LOS_batch")
+        graph_index = kwargs.get("graph_index")
+        device = kwargs.get("device")
+        
+        self.ad_idx_t = self.ad_idx_t.to(device)
+        self.dis_idx_t = self.dis_idx_t.to(device)
+        
+        batch_size = x_embedded.shape[0]
+        num_nodes = len(self.ad_idx_t)
+
+        edge_index = single_edge_index + (num_nodes * graph_index)
+        
+
         # process: [batch * 2, num_nodes, feature_dim]으로 변환하기
-        # 이때 시간 축 평탄화는 다음과 같이 되어야 함: 1, 2, 1, 2, 1, 2, ...
-        # 위와 같이 될 필요는 없음: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
-        # 이렇게 되어도 문제는 없다.
-        x_seperated = seperate_x(x=gin_input, 
+        # 위와 같이 되어야 함: 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ...
+        x_seperated = seperate_x(x=x_embedded, # [B*2, 60, 32]
                                  ad_idx_t=self.ad_idx_t, 
                                  dis_idx_t=self.dis_idx_t, 
                                  device=device)
 
         # GIN에 입력
-        x_after_gin = x_seperated
+        x_flatten = x_seperated.reshape(batch_size * 2 * num_nodes, -1)
+
+        x_after_gin = x_flatten
         sum_pooled = []
         for layer in self.gin_layers:
-            x_after_gin = layer(x_after_gin, template_edge_index) # [B * 2, N(60), F(32)]
-            x_sum = torch.sum(x_after_gin, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
+            x_after_gin = layer(x_after_gin, edge_index) # [B * 2 * N, F(32)]
+            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel) # [B * 2, N, F]
+            x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
             sum_pooled.append(x_sum)
+
         gin_result = torch.concatenate(sum_pooled, dim=1) # [B*2, F*num_gin_layers]
             
         # [B*2, F*num_gin_layers] --> [B, 37, F*num_gin_layers]
@@ -186,9 +392,9 @@ class ExplainerCompatibleGinGru(nn.Module):
         gru_h = gru_h.squeeze(0)
 
         # PackedSequence로 만들었기 때문에 (시간 길이 순 정렬) 역정렬해야 함
-        inv_indices = torch.argsort(sorted_indices.to(gru_h.device))
+        inv_indices = torch.argsort(sorted_indices.to(device))
         gru_h = gru_h[inv_indices]                           
 
         # Classifier에 입력
-        classifier_result = self.classifier_b(gru_h)
-        return classifier_result[0]
+        return self.classifier_b(gru_h)[graph_index]
+    
