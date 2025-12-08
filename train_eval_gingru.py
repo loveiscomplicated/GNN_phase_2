@@ -124,6 +124,35 @@ def save_checkpoint(epoch, model, optimizer, scheduler, best_loss, filename):
     }
     torch.save(checkpoint, filename)
 
+def load_checkpoint(model, optimizer, scheduler, filename, map_location=None):
+    """
+    저장된 체크포인트(.pth)를 불러와서 
+    model, optimizer, scheduler 상태를 복구합니다.
+
+    Parameters:
+        model (nn.Module): 모델 객체
+        optimizer (torch.optim.Optimizer): 옵티마이저 객체
+        scheduler: 스케줄러 객체
+        filename (str): 저장된 체크포인트 경로
+        map_location: CPU로 로드하고 싶으면 'cpu' 또는 torch.device('cpu')
+
+    Returns:
+        start_epoch (int): 다음 훈련을 시작할 epoch 번호
+        best_loss (float): 저장된 최소 validation loss
+    """
+    checkpoint = torch.load(filename, map_location=map_location)
+
+    # --- Load states ---
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+    start_epoch = checkpoint['epoch'] + 1
+    best_loss = checkpoint['best_loss']
+
+    return start_epoch, best_loss
+
+
 if __name__ == "__main__":
     # device = device_set()
     device = torch.device('cpu')
@@ -218,9 +247,7 @@ if __name__ == "__main__":
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-    scheduler = ReduceLROnPlateau(optimizer, "min", patience=10)
-
+    scheduler = ReduceLROnPlateau(optimizer, "min", patience=scheduler_patience)
     early_stopper = EarlyStopper(patience=early_stopping_patience)
 
     with torch.no_grad():
@@ -274,3 +301,8 @@ if __name__ == "__main__":
 
     print("\n--- 학습 완료 ---")
     
+    with torch.no_grad():
+        result = evaluate(model, test_dataloader, criterion, decision_threshold, device, edge_index)
+        test_loss, test_accuracy, test_precision, test_recall, test_f1, test_auc = result
+    
+        print(f"\n[Test] Loss: {test_loss:.4f} | Acc: {test_accuracy:.4f}, Prec: {test_precision:.4f}, Rec: {test_recall:.4f}, F1: {test_f1:.4f}, AUC: {test_auc:.4f}")
