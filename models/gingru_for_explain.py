@@ -233,6 +233,32 @@ class GinGruForExplain(nn.Module):
         # Classifier에 입력
         return self.classifier_b(gru_h)[0]
     
+
+class WeightedGINConv(GINConv):
+    """
+    수정된 버전: GIN의 핵심 로직(MLP, Epsilon)을 모두 포함합니다.
+    """
+    def forward(self, x, edge_index, edge_weight=None):
+        # 1. edge_weight를 클래스 변수로 저장 (message 함수에서 쓰기 위해)
+        self.edge_weight = edge_weight
+        
+        # 2. 메시지 패싱 (이웃 정보 모으기)
+        out = self.propagate(edge_index, x=x)
+        
+        # 3. [중요] 자기 자신 정보 더하기 ((1+eps) * x)
+        x_r = x[1] if isinstance(x, tuple) else x
+        if x_r is not None:
+            out = out + (1 + self.eps) * x_r
+
+        # 4. [매우 중요] MLP 통과 (이게 없으면 학습이 안 됩니다!)
+        return self.nn(out)
+
+    def message(self, x_j):
+        # 저장해둔 edge_weight 사용
+        if self.edge_weight is not None:
+            return x_j * self.edge_weight.view(-1, 1)
+        return x_j
+    
 class GinGruForExplain2(nn.Module):
     def __init__(self, batch_size, col_list, col_dims, ad_col_index, dis_col_index, embedding_dim, gin_hidden_channel, train_eps, gin_layers, gru_hidden_channel):
         '''
@@ -290,11 +316,11 @@ class GinGruForExplain2(nn.Module):
 
         self.gin_layers = nn.ModuleList()
 
-        gin_layer1 = GINConv(nn=gin_nn_input, eps=0, train_eps=train_eps)
+        gin_layer1 = WeightedGINConv(nn=gin_nn_input, eps=0, train_eps=train_eps)
         self.gin_layers.append(gin_layer1)
         
         for _ in range(gin_layers - 1):
-            gin_layer_hidden = GINConv(nn=gin_nn, eps=0, train_eps=train_eps)
+            gin_layer_hidden = WeightedGINConv(nn=gin_nn, eps=0, train_eps=train_eps)
             self.gin_layers.append(gin_layer_hidden)
         
         gru_input_ch = gin_hidden_channel * gin_layers
@@ -313,6 +339,8 @@ class GinGruForExplain2(nn.Module):
         '''
         LOS_batch = kwargs.get("LOS_batch")
         device = kwargs.get("device")
+
+        edge_weight = kwargs.get("edge_weight", None)
 
         self.ad_idx_t = self.ad_idx_t.to(device)
         self.dis_idx_t = self.dis_idx_t.to(device)
@@ -333,7 +361,7 @@ class GinGruForExplain2(nn.Module):
         x_after_gin = x_flatten
         sum_pooled = []
         for layer in self.gin_layers:
-            x_after_gin = layer(x_after_gin, template_edge_index) # [B * 2 * N, F(32)]
+            x_after_gin = layer(x_after_gin, template_edge_index, edge_weight=edge_weight) # [B * 2 * N, F(32)]
             x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel) # [B * 2, N, F]
             x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
             sum_pooled.append(x_sum)

@@ -157,11 +157,11 @@ if __name__ == "__main__":
     # device = device_set()
     device = torch.device('cpu')
     BATCH_SIZE = 32
-    embedding_dim = 32
-    gin_hidden_channel = 32
+    embedding_dim = 64
+    gin_hidden_channel = 64
     train_eps = True
     gin_layers = 2
-    gru_hidden_channel = 64
+    gru_hidden_channel = 128
     decision_threshold = 0.5
 
     EPOCH = 100

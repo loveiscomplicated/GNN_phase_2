@@ -5,7 +5,9 @@ cur_dir = os.path.dirname(__file__)
 par_dir = os.path.join(cur_dir, '..')
 sys.path.append(par_dir)
 import pickle
+import random
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 from torch_geometric.explain import Explainer
 from torch_geometric.explain.algorithm import PGExplainer
@@ -16,6 +18,18 @@ from teds_tensor_dataset import TEDSTensorDataset
 from utils.processing_utils import train_test_split_customed_dataset, mi_edge_index_batched, train_test_split_customed
 from models.gingru_for_explain import GinGruForExplain, GinGruForExplain2
 from models.gin_gru import GinGru
+
+# 기존의 seed_everything 함수
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    print(f"SEED = {seed}")
+
+seed_everything(2025)
 
 def load_checkpoint(model, optimizer, scheduler, filename, device):
     """
@@ -59,8 +73,8 @@ optim_lr = 0.001
 
 epochs = 100
 explainer_lr = 0.003
-edge_size = 0.005
-edge_ent = 0.01
+edge_size = 0.0
+edge_ent = 0.0
 temp = [5.0, 0.5]
 
 sample = False
@@ -102,46 +116,62 @@ model_config = ModelConfig(
     return_type="raw"
 )
 
-import torch
-import sys
-from torch_geometric.explain.algorithm import PGExplainer
+correct_dataset_path = os.path.join(cur_dir, "correct_dataset.pickle")
+if os.path.exists(correct_dataset_path):
+    with open(correct_dataset_path, 'rb') as f:
+        explainer_train_dataset = pickle.load(f)
+else:
+    from get_correct_pred import filter_main
+    filter_main()
+    if os.path.exists(correct_dataset_path):
+        with open(correct_dataset_path, 'rb') as f:
+            explainer_train_dataset = pickle.load(f)
+    else:
+        raise Exception("error occured while filtering data(filter_main)")
 
 class DebugPGExplainer(PGExplainer):
     def _add_mask_regularization(self, loss: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        """Add size and entropy regularization for a mask."""
-        # Apply sigmoid for mask values
-        mask = mask.sigmoid()
+        # 1. Sigmoid 적용 (0~1 사이 값으로 변환)
+        mask_sigmoid = mask.sigmoid()
 
-        # Size regularization
-        size_loss = mask.sum() * self.coeffs['edge_size']
+        # 2. Size Regularization (평균 사용)
+        # mean()을 쓰면 그래프 크기에 상관없이 계수(coeff)의 영향력이 일정해져서 튜닝하기 좋습니다.
+        size_loss = mask_sigmoid.mean() * self.coeffs['edge_size']
 
-        # Entropy regularization
-        masked = 0.99 * mask + 0.005
+        # 3. Entropy Regularization
+        # log(0) 방지를 위한 클리핑
+        masked = 0.99 * mask_sigmoid + 0.005
         mask_ent = -masked * masked.log() - (1 - masked) * (1 - masked).log()
         mask_ent_loss = mask_ent.mean() * self.coeffs['edge_ent']
+        
+        total_loss = loss + size_loss + mask_ent_loss
 
-        import random
-        if random.random() < 0.001:
-            print(f"Prediction_loss: {loss: .4f} | size_loss: {size_loss: .4f} | mask_ent_loss: {mask_ent_loss: .4f} | total_loss: {loss + size_loss + mask_ent_loss: .4f}")
+        if random.random() < 0.01:  # 빈도 조절
+            mask_ratio = mask_sigmoid.mean().item() # 현재 마스크가 평균적으로 얼마나 켜져있는지
+            print(f"--- Debug Step ---")
+            print(f"Pred_Loss: {loss.item():.4f} | Size_Loss: {size_loss.item():.4f} | Ent_Loss: {mask_ent_loss.item():.4f}")
+            print(f"Total_Loss: {total_loss.item():.4f}")
+            print(f"Current Mask Ratio (Mean): {mask_ratio:.4f}") # 이 값이 0에 가까운지 1에 가까운지 보는 게 핵심
+            print(f"Coeffs -> Size: {self.coeffs['edge_size']}, Ent: {self.coeffs['edge_ent']}")
+            print("------------------")
+
         return loss + size_loss + mask_ent_loss
 
     
 algorithm = DebugPGExplainer(
     epochs=epochs,
     lr=explainer_lr,
-    coeffs={
-        'edge_size': edge_size,  # 3. 엣지 개수를 줄이도록 압박 (보통 0.001 ~ 0.1 사이)
-        'edge_ent': edge_ent,    # 4. 값이 0/1로 확실히 갈리도록 압박 (가장 중요!)
-        'temp': temp,
-    }
+    edge_size=0.001,   # sum()일 땐 0.0001이었지만, mean()이므로 0.05 정도가 적당합니다.
+    edge_ent=0.001,     # 마스크 값이 0 또는 1로 확실하게 갈리도록 강력하게 압박합니다.
+    temp=temp
 )
 
 '''algorithm = PGExplainer(
     epochs=epochs,
     lr=explainer_lr,
     coeffs={
-        'edge_size': edge_size,  # 3. 엣지 개수를 줄이도록 압박 (보통 0.001 ~ 0.1 사이)
-        'edge_ent': edge_ent,    # 4. 값이 0/1로 확실히 갈리도록 압박 (가장 중요!)
+        'edge_size': edge_size,  
+        'edge_ent': edge_ent,  
         'temp': temp,
     }
 )'''
@@ -166,6 +196,13 @@ dataset = val_dataset
 train_loader, explainer_loader, test_loader = train_test_split_customed(dataset=dataset,
                                                                   batch_size=batch_size)
 
+
+explainer_loader = DataLoader(dataset=explainer_train_dataset, 
+                              batch_size=batch_size, 
+                              shuffle=True, 
+                              drop_last=True) 
+
+
 edge_index = mi_edge_index_batched(batch_size=batch_size,
                                    num_nodes=num_nodes,
                                    mi_dict_path=mi_dict_path)
@@ -175,7 +212,6 @@ def get_y_pred(x_batch, edge_index, los_batch, device):
     return model(x_embedded=x_batch,template_edge_index=edge_index, LOS_batch=los_batch, device=device)
 
 def train_pgexplainer():
-    best_loss = float('inf')
     best_model_path = ""
     print(f"Start Training PGExplainer on {len(explainer_loader.dataset)} samples...")
     for epoch in range(1, epochs):
@@ -209,7 +245,7 @@ def train_pgexplainer():
             total_loss += loss
         avg_loss = round(total_loss / len(explainer_loader), 4)
         print(f"Epoch: {epoch} - loss: {avg_loss: .4f}")
-        
+
         if sample:
             best_model_path = os.path.join(cur_dir, 'explainer_checkpoints', 'sample', f'PGExplainer_GINGRU_{avg_loss: .4f}.pth')
             
@@ -217,7 +253,7 @@ def train_pgexplainer():
             best_model_path = os.path.join(cur_dir, 'explainer_checkpoints', 'real', f'PGExplainer_GINGRU_{avg_loss: .4f}.pth')
 
         torch.save(explainer.algorithm.state_dict(), best_model_path)
-        print(f"  Best loss updated to {best_loss:.4f}. Model saved.")
+        print(f"  Loss updated to {avg_loss:.4f}. Model saved.")
 
 def load_pgexplainer(best_model_path):
     print("Loading the best model state...")
@@ -379,10 +415,8 @@ def get_diff_mask():
     return difference_mean
 
 
-# train_pgexplainer 함수 시작 부분에 추가
-print(f"Algorithm Type: {type(explainer.algorithm)}") 
-# 출력 결과가 <class '__main__.DebugPGExplainer'> 라고 나와야 정상입니다.
-# 만약 <class 'torch_geometric...PGExplainer'> 라고 나오면 적용이 안 된 것입니다.
+
+
 train_pgexplainer()
 
 
