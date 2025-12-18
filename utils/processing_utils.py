@@ -286,6 +286,48 @@ def mi_edge_index_batched(batch_size, num_nodes, mi_dict_path, top_k=6, threshol
         return batched_edge_index, batched_attr_list
     
     return batched_edge_index
+
+def mi_edge_index_batched_for_gin_baseline(batch_size, num_nodes, mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False, edge_attr_single=None):
+    """
+    배치 처리를 위한 Wrapper 함수
+    """
+    batch_size_d = batch_size
+
+    if return_edge_attr:
+        single, edge_attr= mi_edge_index_improved(
+            mi_dict_path=mi_dict_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+    else:
+        single = mi_edge_index_improved(
+            mi_dict_path=mi_dict_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+
+    edge_list = []
+    attr_list = []
+
+    for g in range(batch_size_d):
+        offset = num_nodes * g
+        edge_i = single + offset
+        edge_list.append(edge_i)
+
+        if return_edge_attr:
+            attr_list.append(edge_attr)
+    
+    batched_edge_index = torch.cat(edge_list, dim=1)
+
+    if return_edge_attr:
+        batched_attr_list = torch.cat(attr_list, dim=0)
+        return batched_edge_index, batched_attr_list
+    
+    return batched_edge_index
     
 def get_col_dims(df: pd.DataFrame):
     '''
@@ -294,7 +336,7 @@ def get_col_dims(df: pd.DataFrame):
     col_dims = [len(df[col].unique()) for col in df.columns]
     return col_dims
 
-def get_ad_dis_col(df:pd.DataFrame):
+def get_ad_dis_col(df:pd.DataFrame, remove_los=True):
     '''
     admission 시의 컬럼, discharge 시의 컬럼을 나누어 리턴
     Args:
@@ -303,9 +345,9 @@ def get_ad_dis_col(df:pd.DataFrame):
         (admission 시의 컬럼 list, discharge 시의 컬럼 list)
     '''
     cols = list(df.columns)
-
-    if 'LOS' in cols:
-        cols.remove('LOS')
+    if remove_los:
+        if 'LOS' in cols:
+            cols.remove('LOS')
 
     if 'REASONb' in cols:
         cols.remove('REASONb')
@@ -329,14 +371,14 @@ def get_ad_dis_col(df:pd.DataFrame):
 def find_indices(lst, targets):
     return [lst.index(t) if t in lst else None for t in targets]
 
-def get_ad_dis_index(df: pd.DataFrame):
+def get_ad_dis_index(df: pd.DataFrame, remove_los=True):
     col_list = list(df.columns)
-    ad, dis = get_ad_dis_col(df)
+    ad, dis = get_ad_dis_col(df, remove_los)
     ad_col_index = find_indices(col_list, ad)
     dis_col_index = find_indices(col_list, dis)
     return ad_col_index, dis_col_index
 
-def get_col_info(df: pd.DataFrame):
+def get_col_info(df: pd.DataFrame, remove_los=True):
     '''
     Returns: (tuple)
         col_list, col_dims, ad_col_index, dis_col_index
@@ -348,7 +390,7 @@ def get_col_info(df: pd.DataFrame):
     '''
     col_list = list(df.columns)
     col_dims = get_col_dims(df)
-    ad_col_index, dis_col_index = get_ad_dis_index(df)
+    ad_col_index, dis_col_index = get_ad_dis_index(df, remove_los)
     return col_list, col_dims, ad_col_index, dis_col_index
 
 def organize_labels(df: pd.DataFrame):

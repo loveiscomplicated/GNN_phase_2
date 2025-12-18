@@ -10,29 +10,26 @@ from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_sco
 
 from utils.write_log import enable_dual_output
 from utils.early_stopper import EarlyStopper
-from utils.processing_utils import mi_edge_index_batched, train_test_split_customed
+from utils.processing_utils import mi_edge_index_batched_for_gin_baseline, train_test_split_customed
 from utils.device_set import device_set
-from teds_tensor_dataset import TEDSTensorDataset
-from models.gin_gru import GinGru
+from teds_tensor_dataset import TEDSDatasetForGIN
+from models.gin import GINBaseline
 
 cur_dir = os.path.dirname(__file__)
-enable_dual_output(f'gingru_1124.txt')
+enable_dual_output(f'gin_1213.txt')
 
 def train(model, dataloader, criterion, optimizer, edge_index, device):
     model.train()
     running_loss = 0.0
-    for x_batch, y_batch, los_batch in tqdm(dataloader, desc="train_process", leave=True):
+    for x_batch, y_batch in tqdm(dataloader, desc="train_process", leave=True):
         x_batch = x_batch.to(device)
         y_batch = y_batch.to(device)
-        los_batch = los_batch.to(device)
 
         optimizer.zero_grad()
 
         logits = model(
             x_batch,
-            los_batch,
-            edge_index,
-            device
+            edge_index
         )
 
         logits = logits.squeeze(1)
@@ -57,16 +54,13 @@ def evaluate(model, val_dataloader, criterion, decision_threshold, device, edge_
     all_scores = []
 
     with torch.no_grad():
-        for x_batch, y_batch, los_batch in tqdm(val_dataloader, desc="eval_process", leave=True):
+        for x_batch, y_batch in tqdm(val_dataloader, desc="eval_process", leave=True):
             x_batch = x_batch.to(device)
             y_batch = y_batch.to(device)
-            los_batch = los_batch.to(device)
 
             logits = model(
                 x_batch,
-                los_batch,
-                edge_index,
-                device
+                edge_index
             )
 
             logits = logits.squeeze(1)
@@ -155,38 +149,36 @@ def load_checkpoint(model, optimizer, scheduler, filename, map_location=None):
 
 if __name__ == "__main__":
     # device = device_set()
-    device = torch.device('cpu')
+    device = torch.device('mps')
     BATCH_SIZE = 32
-    embedding_dim = 64
-    gin_hidden_channel = 64
+    embedding_dim = 32
+    gin_dim = 32
     train_eps = True
-    gin_layers = 2
-    gru_hidden_channel = 128
+    gin_layer_num = 3
     decision_threshold = 0.5
 
     EPOCH = 100
-    scheduler_patience = 6
-    early_stopping_patience = 10
+    scheduler_patience = 10
+    early_stopping_patience = 15
     learning_rate = 0.001
 
     sample = False
 
     if sample:
         root = os.path.join(cur_dir, 'data_tensor_sampled')
-        model_path = os.path.join(cur_dir, 'checkpoints', 'gingru', 'sampled') #####
+        model_path = os.path.join(cur_dir, 'checkpoints', 'gin', 'sampled', "model32321305100101500010") #####
     else:
         root = os.path.join(cur_dir, 'data_tensor_cache')
-        model_path = os.path.join(cur_dir, 'checkpoints', 'gingru', 'real') #####
+        model_path = os.path.join(cur_dir, 'checkpoints', 'gin', 'real', "model32321305100101500010") #####
 
     mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
+####################################################################################################
+    dataset = TEDSDatasetForGIN(root)
 
-    dataset = TEDSTensorDataset(root)
+    col_dims = dataset.col_dims
+    num_nodes = len(dataset.col_dims)
 
-    col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
-
-    num_nodes = len(ad_col_index)
-    
-    edge_index = mi_edge_index_batched(batch_size=BATCH_SIZE,
+    edge_index = mi_edge_index_batched_for_gin_baseline(batch_size=BATCH_SIZE,
                                             mi_dict_path=mi_dict_path,
                                             num_nodes=num_nodes,
                                             top_k=6,
@@ -194,56 +186,20 @@ if __name__ == "__main__":
     
     edge_index = edge_index.to(device) # type: ignore
     
-    model = GinGru(batch_size=BATCH_SIZE,
-                   col_dims=col_dims,
-                   col_list=col_list,
-                   ad_col_index=ad_col_index, 
-                   dis_col_index=dis_col_index,
-                   embedding_dim=embedding_dim,
-                   gin_hidden_channel=gin_hidden_channel,
-                   train_eps=train_eps,
-                   gin_layers=gin_layers,
-                   gru_hidden_channel=gru_hidden_channel)
+    model = GINBaseline(embedding_dim=embedding_dim, 
+                        col_dims=col_dims,
+                        gin_dim=gin_dim, 
+                        gin_layer_num=gin_layer_num, 
+                        train_eps=train_eps)
+    
     model = model.to(device=device)
-    '''
     print(model)
     total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"학습 가능한 파라미터 개수: {total_trainable_params:,}")
-    '''
+
     train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset=dataset,
                                                  batch_size=BATCH_SIZE)
-    '''
-    all_labels = []
-    print("데이터로더를 순회하며 레이블 추출 중...")
-    # train_dataloader를 사용합니다. 데이터셋 튜플의 두 번째 요소(y)가 라벨입니다.
-    for x_batch, y_batch, los_batch in train_dataloader:
-        # 텐서를 CPU로 이동하고 NumPy 배열로 변환
-        all_labels.append(y_batch.cpu().numpy())
-        
-    # 추출된 모든 레이블 배열을 하나로 합칩니다.
-    all_labels = np.concatenate(all_labels)
 
-    # 2. 클래스별 개수 계산
-    n_neg = np.sum(all_labels == 0) # 음성 샘플 수 (레이블 0)
-    n_pos = np.sum(all_labels == 1) # 양성 샘플 수 (레이블 1)
-    n_total = len(all_labels)
-
-    # 3. pos_weight 계산
-    if n_pos > 0:
-        pos_weight_value = n_neg / n_pos
-    else:
-        pos_weight_value = 1.0 # 양성 샘플이 없는 경우 1.0으로 설정
-
-    # 4. 결과 출력 및 pos_weight 텐서 생성 (바로 사용 가능)
-    print("\n--- 클래스 비율 분석 결과 ---")
-    print(f"전체 학습 샘플 수: {n_total:,}")
-    print(f"음성 샘플 (0): {n_neg:,} ({n_neg/n_total*100:.2f}%)")
-    print(f"양성 샘플 (1): {n_pos:,} ({n_pos/n_total*100:.2f}%)")
-    print(f"계산된 pos_weight: {pos_weight_value:.4f}")
-    '''
-    # pos_weight_value = 1.2504 # 음성 / 양성 
-    # pos_weight_tensor = torch.tensor([pos_weight_value], dtype=torch.float).to(device)
-    # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -252,9 +208,11 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         batch = next(iter(val_dataloader))
-        x_batch, los_batch, edge_index, y = batch[0], batch[2], edge_index, batch[1]
+        x_batch, y = batch[0], batch[1]
+        x_batch = x_batch.to(device)
+        y = y.to(device)
 
-        logits = model(x_batch, los_batch, edge_index, device)
+        logits = model(x_batch, edge_index)
         probs = torch.sigmoid(logits)
 
         print("logits mean/std:", logits.mean().item(), logits.std().item())
@@ -280,7 +238,7 @@ if __name__ == "__main__":
             
             best_val_loss = val_loss
             
-            file_name = f"best_gingru_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
+            file_name = f"best_gin_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
             full_save_path = os.path.join(model_path, file_name)
             save_checkpoint(epoch + 1, 
                             model, 

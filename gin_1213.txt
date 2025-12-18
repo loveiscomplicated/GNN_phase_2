@@ -1,0 +1,508 @@
+GINBaseline(
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1180, 32)
+  )
+  (gin_layers): ModuleList(
+    (0-2): 3 x GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (classifier_b): Sequential(
+    (0): Linear(in_features=96, out_features=192, bias=True)
+    (1): ReLU()
+    (2): Linear(in_features=192, out_features=1, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 60,932
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+logits mean/std: 3.74808669090271 1.9293899536132812
+probs min/max/mean: 0.573827862739563 0.9991042017936707 0.9213026762008667
+y label mean: 0.3125
+pos logits mean: 3.115461826324463
+neg logits mean: 4.035643100738525
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.3282. Saving model...
+
+[Epoch 1/100]
+  [Train] LR: 0.001000 | Loss: 0.3620
+  [Valid] Loss: 0.3282 | Acc: 0.8558, Prec: 0.8541, Rec: 0.8537, F1: 0.8539, AUC: 0.9333
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.3197. Saving model...
+
+[Epoch 2/100]
+  [Train] LR: 0.001000 | Loss: 0.3223
+  [Valid] Loss: 0.3197 | Acc: 0.8572, Prec: 0.8550, Rec: 0.8577, F1: 0.8560, AUC: 0.9379
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.3151. Saving model...
+
+[Epoch 3/100]
+  [Train] LR: 0.001000 | Loss: 0.3123
+  [Valid] Loss: 0.3151 | Acc: 0.8653, Prec: 0.8656, Rec: 0.8611, F1: 0.8629, AUC: 0.9394
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 4/100]
+  [Train] LR: 0.001000 | Loss: 0.3066
+  [Valid] Loss: 0.3229 | Acc: 0.8624, Prec: 0.8635, Rec: 0.8574, F1: 0.8597, AUC: 0.9386
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.3025. Saving model...
+
+[Epoch 5/100]
+  [Train] LR: 0.001000 | Loss: 0.3028
+  [Valid] Loss: 0.3025 | Acc: 0.8669, Prec: 0.8649, Rec: 0.8661, F1: 0.8654, AUC: 0.9430
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.3018. Saving model...
+
+[Epoch 6/100]
+  [Train] LR: 0.001000 | Loss: 0.2998
+  [Valid] Loss: 0.3018 | Acc: 0.8684, Prec: 0.8688, Rec: 0.8641, F1: 0.8659, AUC: 0.9433
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 7/100]
+  [Train] LR: 0.001000 | Loss: 0.2976
+  [Valid] Loss: 0.3064 | Acc: 0.8644, Prec: 0.8629, Rec: 0.8671, F1: 0.8637, AUC: 0.9445
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2977. Saving model...
+
+[Epoch 8/100]
+  [Train] LR: 0.001000 | Loss: 0.2956
+  [Valid] Loss: 0.2977 | Acc: 0.8702, Prec: 0.8690, Rec: 0.8677, F1: 0.8683, AUC: 0.9451
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2950. Saving model...
+
+[Epoch 9/100]
+  [Train] LR: 0.001000 | Loss: 0.2940
+  [Valid] Loss: 0.2950 | Acc: 0.8714, Prec: 0.8710, Rec: 0.8679, F1: 0.8692, AUC: 0.9460
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2942. Saving model...
+
+[Epoch 10/100]
+  [Train] LR: 0.001000 | Loss: 0.2925
+  [Valid] Loss: 0.2942 | Acc: 0.8716, Prec: 0.8703, Rec: 0.8695, F1: 0.8699, AUC: 0.9463
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 11/100]
+  [Train] LR: 0.001000 | Loss: 0.2913
+  [Valid] Loss: 0.2995 | Acc: 0.8707, Prec: 0.8687, Rec: 0.8699, F1: 0.8693, AUC: 0.9459
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2935. Saving model...
+
+[Epoch 12/100]
+  [Train] LR: 0.001000 | Loss: 0.2903
+  [Valid] Loss: 0.2935 | Acc: 0.8728, Prec: 0.8722, Rec: 0.8696, F1: 0.8707, AUC: 0.9467
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2934. Saving model...
+
+[Epoch 13/100]
+  [Train] LR: 0.001000 | Loss: 0.2893
+  [Valid] Loss: 0.2934 | Acc: 0.8735, Prec: 0.8731, Rec: 0.8702, F1: 0.8714, AUC: 0.9471
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 14/100]
+  [Train] LR: 0.001000 | Loss: 0.2881
+  [Valid] Loss: 0.2939 | Acc: 0.8733, Prec: 0.8715, Rec: 0.8722, F1: 0.8718, AUC: 0.9467
+Valid preds label counts: tensor([16, 16], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2917. Saving model...
+
+[Epoch 15/100]
+  [Train] LR: 0.001000 | Loss: 0.2875
+  [Valid] Loss: 0.2917 | Acc: 0.8732, Prec: 0.8716, Rec: 0.8717, F1: 0.8716, AUC: 0.9474
+Valid preds label counts: tensor([17, 15], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 16/100]
+  [Train] LR: 0.001000 | Loss: 0.2867
+  [Valid] Loss: 0.2946 | Acc: 0.8741, Prec: 0.8729, Rec: 0.8718, F1: 0.8723, AUC: 0.9477
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2909. Saving model...
+
+[Epoch 17/100]
+  [Train] LR: 0.001000 | Loss: 0.2860
+  [Valid] Loss: 0.2909 | Acc: 0.8739, Prec: 0.8721, Rec: 0.8727, F1: 0.8724, AUC: 0.9478
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 18/100]
+  [Train] LR: 0.001000 | Loss: 0.2853
+  [Valid] Loss: 0.2945 | Acc: 0.8743, Prec: 0.8742, Rec: 0.8707, F1: 0.8721, AUC: 0.9476
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 19/100]
+  [Train] LR: 0.001000 | Loss: 0.2846
+  [Valid] Loss: 0.2922 | Acc: 0.8746, Prec: 0.8741, Rec: 0.8714, F1: 0.8726, AUC: 0.9482
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 20/100]
+  [Train] LR: 0.001000 | Loss: 0.2842
+  [Valid] Loss: 0.2915 | Acc: 0.8745, Prec: 0.8727, Rec: 0.8734, F1: 0.8730, AUC: 0.9480
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 21/100]
+  [Train] LR: 0.001000 | Loss: 0.2837
+  [Valid] Loss: 0.2917 | Acc: 0.8725, Prec: 0.8707, Rec: 0.8716, F1: 0.8711, AUC: 0.9474
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2901. Saving model...
+
+[Epoch 22/100]
+  [Train] LR: 0.001000 | Loss: 0.2832
+  [Valid] Loss: 0.2901 | Acc: 0.8733, Prec: 0.8717, Rec: 0.8717, F1: 0.8717, AUC: 0.9477
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2880. Saving model...
+
+[Epoch 23/100]
+  [Train] LR: 0.001000 | Loss: 0.2828
+  [Valid] Loss: 0.2880 | Acc: 0.8753, Prec: 0.8746, Rec: 0.8723, F1: 0.8733, AUC: 0.9487
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 24/100]
+  [Train] LR: 0.001000 | Loss: 0.2823
+  [Valid] Loss: 0.2902 | Acc: 0.8743, Prec: 0.8744, Rec: 0.8704, F1: 0.8720, AUC: 0.9480
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2878. Saving model...
+
+[Epoch 25/100]
+  [Train] LR: 0.001000 | Loss: 0.2818
+  [Valid] Loss: 0.2878 | Acc: 0.8747, Prec: 0.8736, Rec: 0.8723, F1: 0.8729, AUC: 0.9485
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 26/100]
+  [Train] LR: 0.001000 | Loss: 0.2813
+  [Valid] Loss: 0.2937 | Acc: 0.8736, Prec: 0.8745, Rec: 0.8691, F1: 0.8712, AUC: 0.9480
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 27/100]
+  [Train] LR: 0.001000 | Loss: 0.2814
+  [Valid] Loss: 0.2913 | Acc: 0.8742, Prec: 0.8725, Rec: 0.8729, F1: 0.8727, AUC: 0.9482
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 28/100]
+  [Train] LR: 0.001000 | Loss: 0.2809
+  [Valid] Loss: 0.2957 | Acc: 0.8746, Prec: 0.8736, Rec: 0.8720, F1: 0.8727, AUC: 0.9483
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 29/100]
+  [Train] LR: 0.001000 | Loss: 0.2804
+  [Valid] Loss: 0.2897 | Acc: 0.8740, Prec: 0.8719, Rec: 0.8740, F1: 0.8728, AUC: 0.9484
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 30/100]
+  [Train] LR: 0.001000 | Loss: 0.2801
+  [Valid] Loss: 0.2914 | Acc: 0.8736, Prec: 0.8716, Rec: 0.8737, F1: 0.8724, AUC: 0.9488
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2876. Saving model...
+
+[Epoch 31/100]
+  [Train] LR: 0.001000 | Loss: 0.2799
+  [Valid] Loss: 0.2876 | Acc: 0.8759, Prec: 0.8751, Rec: 0.8732, F1: 0.8740, AUC: 0.9491
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 32/100]
+  [Train] LR: 0.001000 | Loss: 0.2794
+  [Valid] Loss: 0.2897 | Acc: 0.8753, Prec: 0.8748, Rec: 0.8721, F1: 0.8732, AUC: 0.9485
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 33/100]
+  [Train] LR: 0.001000 | Loss: 0.2795
+  [Valid] Loss: 0.2894 | Acc: 0.8739, Prec: 0.8747, Rec: 0.8695, F1: 0.8715, AUC: 0.9484
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 34/100]
+  [Train] LR: 0.001000 | Loss: 0.2792
+  [Valid] Loss: 0.2892 | Acc: 0.8758, Prec: 0.8750, Rec: 0.8731, F1: 0.8740, AUC: 0.9491
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 35/100]
+  [Train] LR: 0.001000 | Loss: 0.2788
+  [Valid] Loss: 0.2919 | Acc: 0.8731, Prec: 0.8710, Rec: 0.8736, F1: 0.8720, AUC: 0.9488
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2869. Saving model...
+
+[Epoch 36/100]
+  [Train] LR: 0.001000 | Loss: 0.2788
+  [Valid] Loss: 0.2869 | Acc: 0.8766, Prec: 0.8757, Rec: 0.8741, F1: 0.8748, AUC: 0.9494
+Valid preds label counts: tensor([17, 15], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 37/100]
+  [Train] LR: 0.001000 | Loss: 0.2785
+  [Valid] Loss: 0.2886 | Acc: 0.8747, Prec: 0.8727, Rec: 0.8744, F1: 0.8734, AUC: 0.9490
+Valid preds label counts: tensor([17, 15], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 38/100]
+  [Train] LR: 0.001000 | Loss: 0.2783
+  [Valid] Loss: 0.2894 | Acc: 0.8756, Prec: 0.8737, Rec: 0.8748, F1: 0.8742, AUC: 0.9489
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 39/100]
+  [Train] LR: 0.001000 | Loss: 0.2781
+  [Valid] Loss: 0.2873 | Acc: 0.8769, Prec: 0.8762, Rec: 0.8740, F1: 0.8750, AUC: 0.9497
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 40/100]
+  [Train] LR: 0.001000 | Loss: 0.2779
+  [Valid] Loss: 0.2881 | Acc: 0.8760, Prec: 0.8744, Rec: 0.8743, F1: 0.8744, AUC: 0.9489
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 41/100]
+  [Train] LR: 0.001000 | Loss: 0.2778
+  [Valid] Loss: 0.2893 | Acc: 0.8759, Prec: 0.8747, Rec: 0.8737, F1: 0.8742, AUC: 0.9493
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2864. Saving model...
+
+[Epoch 42/100]
+  [Train] LR: 0.001000 | Loss: 0.2775
+  [Valid] Loss: 0.2864 | Acc: 0.8760, Prec: 0.8743, Rec: 0.8746, F1: 0.8745, AUC: 0.9490
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 43/100]
+  [Train] LR: 0.001000 | Loss: 0.2774
+  [Valid] Loss: 0.2867 | Acc: 0.8760, Prec: 0.8752, Rec: 0.8732, F1: 0.8741, AUC: 0.9494
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 44/100]
+  [Train] LR: 0.001000 | Loss: 0.2772
+  [Valid] Loss: 0.2880 | Acc: 0.8765, Prec: 0.8760, Rec: 0.8735, F1: 0.8746, AUC: 0.9493
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 45/100]
+  [Train] LR: 0.001000 | Loss: 0.2770
+  [Valid] Loss: 0.2880 | Acc: 0.8746, Prec: 0.8725, Rec: 0.8750, F1: 0.8735, AUC: 0.9494
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2850. Saving model...
+
+[Epoch 46/100]
+  [Train] LR: 0.001000 | Loss: 0.2768
+  [Valid] Loss: 0.2850 | Acc: 0.8765, Prec: 0.8752, Rec: 0.8745, F1: 0.8749, AUC: 0.9495
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 47/100]
+  [Train] LR: 0.001000 | Loss: 0.2766
+  [Valid] Loss: 0.2881 | Acc: 0.8751, Prec: 0.8735, Rec: 0.8736, F1: 0.8735, AUC: 0.9491
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 48/100]
+  [Train] LR: 0.001000 | Loss: 0.2767
+  [Valid] Loss: 0.2878 | Acc: 0.8751, Prec: 0.8754, Rec: 0.8712, F1: 0.8729, AUC: 0.9490
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 49/100]
+  [Train] LR: 0.001000 | Loss: 0.2764
+  [Valid] Loss: 0.2898 | Acc: 0.8752, Prec: 0.8743, Rec: 0.8726, F1: 0.8734, AUC: 0.9490
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 50/100]
+  [Train] LR: 0.001000 | Loss: 0.2764
+  [Valid] Loss: 0.2861 | Acc: 0.8759, Prec: 0.8753, Rec: 0.8728, F1: 0.8739, AUC: 0.9494
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 51/100]
+  [Train] LR: 0.001000 | Loss: 0.2761
+  [Valid] Loss: 0.2867 | Acc: 0.8756, Prec: 0.8742, Rec: 0.8737, F1: 0.8740, AUC: 0.9493
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 52/100]
+  [Train] LR: 0.001000 | Loss: 0.2762
+  [Valid] Loss: 0.2885 | Acc: 0.8733, Prec: 0.8712, Rec: 0.8740, F1: 0.8722, AUC: 0.9493
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 53/100]
+  [Train] LR: 0.001000 | Loss: 0.2757
+  [Valid] Loss: 0.2908 | Acc: 0.8744, Prec: 0.8730, Rec: 0.8726, F1: 0.8728, AUC: 0.9484
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 54/100]
+  [Train] LR: 0.001000 | Loss: 0.2757
+  [Valid] Loss: 0.2859 | Acc: 0.8760, Prec: 0.8748, Rec: 0.8739, F1: 0.8743, AUC: 0.9494
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 55/100]
+  [Train] LR: 0.001000 | Loss: 0.2755
+  [Valid] Loss: 0.2949 | Acc: 0.8734, Prec: 0.8740, Rec: 0.8690, F1: 0.8710, AUC: 0.9481
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 56/100]
+  [Train] LR: 0.001000 | Loss: 0.2757
+  [Valid] Loss: 0.2894 | Acc: 0.8753, Prec: 0.8732, Rec: 0.8752, F1: 0.8740, AUC: 0.9498
+Valid preds label counts: tensor([18, 14], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 57/100]
+  [Train] LR: 0.000100 | Loss: 0.2757
+  [Valid] Loss: 0.2887 | Acc: 0.8750, Prec: 0.8735, Rec: 0.8733, F1: 0.8734, AUC: 0.9484
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2831. Saving model...
+
+[Epoch 58/100]
+  [Train] LR: 0.000100 | Loss: 0.2660
+  [Valid] Loss: 0.2831 | Acc: 0.8781, Prec: 0.8766, Rec: 0.8766, F1: 0.8766, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2826. Saving model...
+
+[Epoch 59/100]
+  [Train] LR: 0.000100 | Loss: 0.2651
+  [Valid] Loss: 0.2826 | Acc: 0.8779, Prec: 0.8765, Rec: 0.8762, F1: 0.8763, AUC: 0.9508
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🎉 New best validation loss: 0.2825. Saving model...
+
+[Epoch 60/100]
+  [Train] LR: 0.000100 | Loss: 0.2647
+  [Valid] Loss: 0.2825 | Acc: 0.8779, Prec: 0.8761, Rec: 0.8769, F1: 0.8765, AUC: 0.9508
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 61/100]
+  [Train] LR: 0.000100 | Loss: 0.2645
+  [Valid] Loss: 0.2839 | Acc: 0.8780, Prec: 0.8767, Rec: 0.8761, F1: 0.8763, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 62/100]
+  [Train] LR: 0.000100 | Loss: 0.2644
+  [Valid] Loss: 0.2830 | Acc: 0.8778, Prec: 0.8761, Rec: 0.8764, F1: 0.8763, AUC: 0.9507
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 63/100]
+  [Train] LR: 0.000100 | Loss: 0.2643
+  [Valid] Loss: 0.2834 | Acc: 0.8778, Prec: 0.8764, Rec: 0.8759, F1: 0.8762, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 64/100]
+  [Train] LR: 0.000100 | Loss: 0.2642
+  [Valid] Loss: 0.2841 | Acc: 0.8782, Prec: 0.8774, Rec: 0.8754, F1: 0.8763, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 65/100]
+  [Train] LR: 0.000100 | Loss: 0.2641
+  [Valid] Loss: 0.2829 | Acc: 0.8781, Prec: 0.8768, Rec: 0.8760, F1: 0.8764, AUC: 0.9507
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 66/100]
+  [Train] LR: 0.000100 | Loss: 0.2640
+  [Valid] Loss: 0.2839 | Acc: 0.8779, Prec: 0.8767, Rec: 0.8757, F1: 0.8762, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 67/100]
+  [Train] LR: 0.000100 | Loss: 0.2640
+  [Valid] Loss: 0.2832 | Acc: 0.8773, Prec: 0.8754, Rec: 0.8768, F1: 0.8760, AUC: 0.9507
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 68/100]
+  [Train] LR: 0.000100 | Loss: 0.2638
+  [Valid] Loss: 0.2839 | Acc: 0.8777, Prec: 0.8760, Rec: 0.8765, F1: 0.8762, AUC: 0.9506
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 69/100]
+  [Train] LR: 0.000100 | Loss: 0.2639
+  [Valid] Loss: 0.2836 | Acc: 0.8778, Prec: 0.8762, Rec: 0.8763, F1: 0.8762, AUC: 0.9506
+Valid preds label counts: tensor([19, 13], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 70/100]
+  [Train] LR: 0.000100 | Loss: 0.2638
+  [Valid] Loss: 0.2859 | Acc: 0.8776, Prec: 0.8759, Rec: 0.8765, F1: 0.8762, AUC: 0.9506
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 71/100]
+  [Train] LR: 0.000010 | Loss: 0.2638
+  [Valid] Loss: 0.2833 | Acc: 0.8777, Prec: 0.8759, Rec: 0.8767, F1: 0.8763, AUC: 0.9507
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 72/100]
+  [Train] LR: 0.000010 | Loss: 0.2624
+  [Valid] Loss: 0.2846 | Acc: 0.8778, Prec: 0.8765, Rec: 0.8758, F1: 0.8761, AUC: 0.9507
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 73/100]
+  [Train] LR: 0.000010 | Loss: 0.2623
+  [Valid] Loss: 0.2849 | Acc: 0.8776, Prec: 0.8760, Rec: 0.8761, F1: 0.8760, AUC: 0.9506
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+
+[Epoch 74/100]
+  [Train] LR: 0.000010 | Loss: 0.2623
+  [Valid] Loss: 0.2853 | Acc: 0.8777, Prec: 0.8761, Rec: 0.8762, F1: 0.8762, AUC: 0.9506
+Valid preds label counts: tensor([20, 12], device='mps:0')
+Valid true label counts: tensor([19, 13], device='mps:0')
+🛑 Early stopping triggered after 15 epochs without improvement.
+
+[Epoch 75/100]
+  [Train] LR: 0.000010 | Loss: 0.2623
+  [Valid] Loss: 0.2849 | Acc: 0.8777, Prec: 0.8764, Rec: 0.8758, F1: 0.8761, AUC: 0.9506
+
+--- Early Stopping activated. Learning terminated. ---
+
+--- 학습 완료 ---
+Valid preds label counts: tensor([22, 10], device='mps:0')
+Valid true label counts: tensor([21, 11], device='mps:0')
+
+[Test] Loss: 0.2882 | Acc: 0.8773, Prec: 0.8759, Rec: 0.8754, F1: 0.8756, AUC: 0.9499

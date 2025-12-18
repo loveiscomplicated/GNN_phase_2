@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from torch_geometric.explain import Explainer
 from torch_geometric.explain.algorithm import PGExplainer
 from torch_geometric.explain.config import ModelConfig
+from sklearn.metrics import roc_auc_score
 from tqdm import tqdm
 
 from teds_tensor_dataset import TEDSTensorDataset
@@ -67,7 +68,7 @@ gin_layers = 2
 gru_hidden_channel = 64
 
 scheduler_patience = 15
-# early_stopping_patience = 10
+early_stopping_patience = 10
 device = torch.device("cpu")
 optim_lr = 0.001
 
@@ -107,6 +108,15 @@ model = GinGruForExplain2(
     gin_layers=gin_layers,
     gru_hidden_channel=gru_hidden_channel
 )
+import torch.nn as nn
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from utils.early_stopper import EarlyStopper
+criterion = nn.BCEWithLogitsLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=optim_lr)
+scheduler = ReduceLROnPlateau(optimizer, "min", patience=scheduler_patience)
+early_stopper = EarlyStopper(patience=early_stopping_patience)
+
+load_checkpoint(model, optimizer, scheduler, filename=checkpoint_path, device=device)
 model.to(device)
 model.eval()
 
@@ -268,7 +278,7 @@ def load_pgexplainer(best_model_path):
 
 def get_mean_edge_mask(best_model_path, loader, num_edges_single, edge_mask_mean_save_path):
     explainer = load_pgexplainer(best_model_path)
-    
+    edge_index = mi_edge_index_batched(batch_size=batch_size, num_nodes=num_nodes, mi_dict_path=mi_dict_path)
     model.eval() 
     total_graphs_count = 0
     
@@ -353,71 +363,268 @@ def train_all():
 
     return edge_mask_mean
 
-def get_diff_mask():
-    model.eval() 
-    best_model_path = os.path.join(save_dir, 'PGExplainer_GINGRU_ 0.7275.pth')
+import os
+import torch
+import numpy as np
+from sklearn.metrics import roc_auc_score
+
+@torch.no_grad()
+def get_diff_mask_pooled_auc(
+    model,
+    train_loader,
+    device,
+    save_dir,
+    mi_dict_path,
+    batch_size: int,
+    edge_threshold: int = 10,
+    is_topk: bool = True,
+    max_batches: int = 100,
+    model_output_is_logit: bool = True,  # True면 sigmoid 적용, False면 그대로 확률로 사용
+):
+    model.eval()
+
+    # 1) PGExplainer 로드
+    best_model_path = os.path.join(save_dir, 'PGExplainer_GINGRU_ 0.6189.pth')
     explainer = load_pgexplainer(best_model_path)
 
-    counter = 0
-    difference_sum = 0.0
-    for batch in train_loader:
-        if counter == 100: break
-        x_batch, y_batch, los_batch = batch
+    # 2) batched edge_index 준비
+    edge_index = mi_edge_index_batched(32, 60, mi_dict_path).to(device)
 
+    # 누적용
+    diff_sum = 0.0
+    n_samples = 0
+
+    y_true_all = []
+    y_score_orig_all = []
+    y_score_mask_all = []
+
+    counter = 0
+    for batch in train_loader:
+        if counter >= max_batches:
+            break
+
+        x_batch, y_batch, los_batch = batch
+        x_batch = x_batch.to(device)
+        y_batch = y_batch.to(device).view(-1)   # (B,)
+        los_batch = los_batch.to(device)
+
+        # 임베딩
+        x_embedded = model.entity_embedding_layer(x_batch)
+
+        # 설명(마스크) 계산
+        explanation = explainer.algorithm.forward(
+            model=model,
+            x=x_embedded,
+            edge_index=edge_index,
+            target=y_batch,
+            LOS_batch=los_batch,
+            device=device
+        )
+
+        mask = explanation.edge_mask
+        print(f"Mask Mean: {mask.mean().item(): .4f}")
+
+        # --- masked_edge_index 생성 ---
+        # IMPORTANT: 이 방식은 "배치 내 각 그래프가 동일한 edge template"이라는 가정이 있어야 안전함
+        num_edges_single = edge_index.shape[1] // (batch_size * 2)
+        mask_reshaped = mask.view(batch_size * 2, num_edges_single)
+
+        masked_edge_index = None
+        for i in range(mask_reshaped.shape[0]):
+            local_idx = mask_reshaped[i].topk(edge_threshold, largest=is_topk).indices
+            offset = i * num_edges_single
+            global_idx = offset + local_idx
+            masked_edge_index_single = edge_index[:, global_idx]
+
+            if masked_edge_index is None:
+                masked_edge_index = masked_edge_index_single
+            else:
+                masked_edge_index = torch.cat((masked_edge_index, masked_edge_index_single), dim=1)
+
+        # --- 모델 출력 ---
+        original_out = model(x_embedded, edge_index, LOS_batch=los_batch, device=device).view(-1)
+        masked_out = model(x_embedded, masked_edge_index, LOS_batch=los_batch, device=device).view(-1)
+
+        # 차이(샘플 단위 평균 diff)
+        diff = torch.abs(original_out - masked_out)  # (B,)
+        diff_sum += diff.sum().item()
+        n_samples += diff.numel()
+
+        print(f"Original out mean: {original_out.mean().item(): .4f} | Masked out mean: {masked_out.mean().item(): .4f} "
+              f"| Mean |Δ|: {diff.mean().item(): .4f}")
+
+        # pooled AUC용 score 저장
+        if model_output_is_logit:
+            orig_score = original_out.sigmoid()
+            mask_score = masked_out.sigmoid()
+        else:
+            # 이미 확률이면 그대로 사용
+            orig_score = original_out
+            mask_score = masked_out
+
+        y_true_all.append(y_batch.detach().cpu())
+        y_score_orig_all.append(orig_score.detach().cpu())
+        y_score_mask_all.append(mask_score.detach().cpu())
+
+        counter += 1
+
+    # --- pooled AUC 계산 ---
+    y_true_all = torch.cat(y_true_all).numpy().reshape(-1)
+    y_score_orig_all = torch.cat(y_score_orig_all).numpy().reshape(-1)
+    y_score_mask_all = torch.cat(y_score_mask_all).numpy().reshape(-1)
+
+    def safe_auc(y_true, y_score):
+        try:
+            return roc_auc_score(y_true, y_score)
+        except ValueError:
+            return np.nan  # 한 클래스만 있는 경우 등
+
+    orig_auc = safe_auc(y_true_all, y_score_orig_all)
+    mask_auc = safe_auc(y_true_all, y_score_mask_all)
+
+    auc_diff = np.abs(orig_auc - mask_auc) if (np.isfinite(orig_auc) and np.isfinite(mask_auc)) else np.nan
+
+    diff_mean = diff_sum / max(1, n_samples)
+
+    print(f"\n=== Summary (pooled over {counter} batches, {n_samples} samples) ===")
+    print(f"Mean |Δlogit(or prob)| per sample: {diff_mean: .6f}")
+    print(f"Pooled Original AUC: {orig_auc: .6f}")
+    print(f"Pooled Masked   AUC: {mask_auc: .6f}")
+    print(f"Pooled AUC Diff     : {auc_diff: .6f}")
+
+    return diff_mean, orig_auc, mask_auc, auc_diff
+
+import torch
+from sklearn.metrics import roc_auc_score
+
+@torch.no_grad()
+def pooled_auc(y_true_all, logits_all):
+    y_true = y_true_all.detach().cpu().numpy().reshape(-1)
+    y_prob = torch.sigmoid(logits_all).detach().cpu().numpy().reshape(-1)
+    return roc_auc_score(y_true, y_prob)
+
+@torch.no_grad()
+def eval_soft_mask_auc(
+    model,
+    loader,
+    edge_index_sup,     # "B*2 graphs용" supersized edge_index여야 함
+    device,
+    batch_size,
+    num_nodes,
+    num_batches=100,
+    mode="mask",        # "mask" or "remove"
+):
+    model.eval()
+    best_model_path = os.path.join(save_dir, 'PGExplainer_GINGRU_ 0.6189.pth')
+    explainer = load_pgexplainer(best_model_path)
+
+    edge_index_sup = edge_index_sup.to(device)
+
+    ys = []
+    orig_logits = []
+    masked_logits = []
+    diffs = []
+
+    counter = 0
+    for batch in loader:
+        if counter >= num_batches:
+            break
+
+        x_batch, y_batch, los_batch = batch
         x_batch = x_batch.to(device)
         y_batch = y_batch.to(device)
         los_batch = los_batch.to(device)
-        edge_index = edge_index.to(device)
 
-        with torch.no_grad():
-            x_embedded = model.entity_embedding_layer(x_batch)
+        x_embedded = model.entity_embedding_layer(x_batch)
 
-            
-            explanation = explainer.algorithm.forward(model=model,
-                                                    x=x_embedded,
-                                                    edge_index=edge_index,
-                                                    target=y_batch,
-                                                    LOS_batch=los_batch,
-                                                    device=device)
-            print(f"Mask Min: {explanation.edge_mask.min()}, Max: {explanation.edge_mask.max()}, Mean: {explanation.edge_mask.mean()}")
-            
-            
-            edge_threshold = 10
-            is_topk = False # 반대 방향 실험은 is_topk = False, 이때는 difference가 크게 나야 함
+        # PGExplainer가 반환하는 edge_mask 길이는 edge_index_sup의 E와 같아야 함
+        explanation = explainer.algorithm.forward(
+            model=model,
+            x=x_embedded,
+            edge_index=edge_index_sup,
+            target=y_batch,
+            LOS_batch=los_batch,
+            device=device
+        )
 
-            num_edges_single = edge_index.shape[1] // batch_size
+        edge_mask = explanation.edge_mask  # shape [E_total]
 
-            mask_reshaped = explanation.edge_mask.view(batch_size, num_edges_single)
+        # remove 모드면 중요 edge를 약화시키는 방향
+        if mode == "remove":
+            edge_weight = 1.0 - edge_mask
+        else:
+            edge_weight = edge_mask
 
-            masked_edge_index = None
-            for i in range(mask_reshaped.shape[0]):
-                local_idx = mask_reshaped[i].topk(edge_threshold, largest=is_topk).indices
-                offset = i * num_edges_single
-                global_idx = offset + local_idx
-                masked_edge_index_single = edge_index[:, global_idx]
+        # sanity: 길이 체크
+        assert edge_weight.numel() == edge_index_sup.size(1), \
+            f"edge_weight({edge_weight.numel()}) != num_edges({edge_index_sup.size(1)})"
 
-                if masked_edge_index is None:
-                    masked_edge_index = masked_edge_index_single
+        # 원본/소프트마스크 logits
+        out_orig = model(x_embedded, edge_index_sup, LOS_batch=los_batch, device=device)
+        out_mask = model(x_embedded, edge_index_sup, LOS_batch=los_batch, device=device, edge_weight=edge_weight)
 
-                else:
-                    masked_edge_index = torch.cat((masked_edge_index, masked_edge_index_single), dim=1)
+        ys.append(y_batch.detach())
+        orig_logits.append(out_orig.detach())
+        masked_logits.append(out_mask.detach())
+        diffs.append((out_orig - out_mask).abs().detach().cpu())
 
-            original_out = model(x_embedded, edge_index, LOS_batch=los_batch, device=device).sigmoid()
-            masked_out = model(x_embedded, masked_edge_index, LOS_batch=los_batch, device=device).sigmoid()
-            difference = abs(original_out - masked_out).sum()
+        counter += 1
 
-            print(f"Original output(prob): {original_out.mean(): .4f} | Masked output(prob): {masked_out.mean(): .4f} | Difference: {difference / batch_size: .4f}")
-            counter += 1
-            difference_sum += difference
+    ys = torch.cat(ys, dim=0)
+    orig_logits = torch.cat(orig_logits, dim=0)
+    masked_logits = torch.cat(masked_logits, dim=0)
 
-    difference_mean = difference_sum / (counter * batch_size)
-    print(f"Average difference: {difference_mean: .4f}")
-    return difference_mean
+    mean_abs_logit_diff = torch.cat(diffs, dim=0).mean().item()
+    auc_orig = pooled_auc(ys, orig_logits)
+    auc_mask = pooled_auc(ys, masked_logits)
+    auc_diff = abs(auc_orig - auc_mask)
+
+    print(f"=== Soft-mask Summary (pooled over {counter} batches, {ys.shape[0]} samples) ===")
+    print(f"Mode: {mode}")
+    print(f"Mean |Δlogit| per sample:  {mean_abs_logit_diff:.6f}")
+    print(f"Pooled Original AUC:  {auc_orig:.6f}")
+    print(f"Pooled Masked   AUC:  {auc_mask:.6f}")
+    print(f"Pooled AUC Diff     :  {auc_diff:.6f}")
+
+    return {
+        "mean_abs_logit_diff": mean_abs_logit_diff,
+        "auc_orig": auc_orig,
+        "auc_masked": auc_mask,
+        "auc_diff": auc_diff,
+        "n_samples": int(ys.shape[0]),
+        "n_batches": counter,
+    }
 
 
 
+# train_pgexplainer()
+'''get_diff_mask_pooled_auc(model=model,
+                         train_loader=test_loader,
+                         device=device,
+                         save_dir=save_dir,
+                         mi_dict_path=mi_dict_path,
+                         batch_size=batch_size,
+                         edge_threshold=10,
+                         is_topk=False,
+                         max_batches=100,
+                         model_output_is_logit=True)
+'''
+eval_soft_mask_auc(model=model,
+                   loader=test_loader,
+                   edge_index_sup=edge_index,
+                   device=device,
+                   batch_size=batch_size,
+                   num_nodes=num_nodes,
+                   num_batches=100,
+                   mode='mask')
 
-train_pgexplainer()
-
+eval_soft_mask_auc(model=model,
+                   loader=test_loader,
+                   edge_index_sup=edge_index,
+                   device=device,
+                   batch_size=batch_size,
+                   num_nodes=num_nodes,
+                   num_batches=100,
+                   mode='remove')
 
 

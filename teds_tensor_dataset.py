@@ -15,7 +15,7 @@ import torch
 import pandas as pd
 
 from torch.utils.data import Dataset, DataLoader
-from utils.processing_utils import get_col_info, organize_labels, df_to_tensor
+from utils.processing_utils import get_col_info, organize_labels, df_to_tensor, get_col_dims
 
 CURDIR = os.path.dirname(__file__)
 
@@ -141,6 +141,41 @@ class TEDSTensorDataset(Dataset):
         # LOS는 pd.Series임
         # col_info는 다음과 같음 (col_list, col_dims, ad_col_index, dis_col_index)
         return df_tensor, col_info, LOS # -> self.process하면 tuple로 반환될 것
+    
+    
+class TEDSDatasetForGIN(Dataset):
+    def __init__(self, root):
+        super().__init__()
+        self.root = root
+        self.raw_dir = os.path.join(root, "raw")
+        if not os.path.exists(self.raw_dir):
+            os.mkdir(self.raw_dir)
+
+        self.process_dir = os.path.join(root, 'process')
+        if not os.path.exists(self.process_dir):
+            os.mkdir(self.process_dir)
+
+        data_path = os.path.join(self.raw_dir, 'missing_corrected.csv')
+        df = pd.read_csv(data_path)
+        
+        if 'REASONb' not in df.columns:
+            raise ValueError('raw data에서 REASONb 데이터를 찾을 수 없습니다.')
+        
+        # label_organize
+        df = organize_labels(df)
+
+        self.df_tensor = df_to_tensor(df)
+        df = df.drop("REASONb", axis=1)
+        self.col_dims = get_col_dims(df)
+    
+    def __getitem__(self, index):
+        x = self.df_tensor[index, :-1]
+        y = self.df_tensor[index, -1]
+        return x, y
+    
+    def __len__(self):
+        return self.df_tensor.shape[0]
+    
 
 if __name__ == "__main__":
     root = os.path.join(CURDIR, 'data_tensor_cache')
