@@ -129,6 +129,7 @@ class TEDSTensorDataset(Dataset):
         
         # label_organize
         df = organize_labels(df)
+        
         # df to tensor
         df_tensor = df_to_tensor(df)
         

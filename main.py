@@ -1,12 +1,11 @@
 import os
-from models.ctmp_gin import CtmpGIN
-from teds_tensor_dataset import TEDSDatasetforCtempGIN, TEDSTensorDataset
+from teds_tensor_dataset import TEDSTensorDataset
 
 cur_dir = os.path.dirname(__file__)
 root = os.path.join(cur_dir, 'data_tensor_cache')
-dataset = TEDSDatasetforCtempGIN(root)
 
-print(dataset[0][0].shape)
+dataset = TEDSTensorDataset(root)
 
-dataset2 = TEDSTensorDataset(root)
-print(dataset2[0][0].shape)
+print(dataset[0])
+col_list, col_dims, ad_col_index, dis_col_index = dataset.col_info
+print(col_dims)
