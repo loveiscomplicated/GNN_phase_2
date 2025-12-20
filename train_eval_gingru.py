@@ -16,7 +16,7 @@ from teds_tensor_dataset import TEDSTensorDataset
 from models.gin_gru import GinGru
 
 cur_dir = os.path.dirname(__file__)
-enable_dual_output(f'gingru_1124.txt')
+enable_dual_output(f'gingru_1218.txt')
 
 def train(model, dataloader, criterion, optimizer, edge_index, device):
     model.train()
@@ -157,15 +157,15 @@ if __name__ == "__main__":
     # device = device_set()
     device = torch.device('cpu')
     BATCH_SIZE = 32
-    embedding_dim = 64
-    gin_hidden_channel = 64
+    embedding_dim = 32
+    gin_hidden_channel = 32
     train_eps = True
     gin_layers = 2
-    gru_hidden_channel = 128
+    gru_hidden_channel = 64
     decision_threshold = 0.5
 
     EPOCH = 100
-    scheduler_patience = 6
+    scheduler_patience = 5
     early_stopping_patience = 10
     learning_rate = 0.001
 
@@ -205,11 +205,11 @@ if __name__ == "__main__":
                    gin_layers=gin_layers,
                    gru_hidden_channel=gru_hidden_channel)
     model = model.to(device=device)
-    '''
+    
     print(model)
     total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"학습 가능한 파라미터 개수: {total_trainable_params:,}")
-    '''
+    
     train_dataloader, val_dataloader, test_dataloader = train_test_split_customed(dataset=dataset,
                                                  batch_size=BATCH_SIZE)
     '''
@@ -254,6 +254,11 @@ if __name__ == "__main__":
         batch = next(iter(val_dataloader))
         x_batch, los_batch, edge_index, y = batch[0], batch[2], edge_index, batch[1]
 
+        x_batch = x_batch.to(device)
+        los_batch = los_batch.to(device)
+        edge_index = edge_index.to(device)
+        y = y.to(device)
+
         logits = model(x_batch, los_batch, edge_index, device)
         probs = torch.sigmoid(logits)
 
@@ -280,7 +285,7 @@ if __name__ == "__main__":
             
             best_val_loss = val_loss
             
-            file_name = f"best_gingru_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
+            file_name = f"1218_gingru_epoch_{epoch+1}_loss_{best_val_loss:.4f}.pth"
             full_save_path = os.path.join(model_path, file_name)
             save_checkpoint(epoch + 1, 
                             model, 

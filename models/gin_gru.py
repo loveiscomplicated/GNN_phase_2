@@ -100,7 +100,19 @@ def seperate_x(x: torch.Tensor, ad_idx_t, dis_idx_t, device):
 
 
 class GinGru(nn.Module):
-    def __init__(self, batch_size, col_list, col_dims, ad_col_index, dis_col_index, embedding_dim, gin_hidden_channel, train_eps, gin_layers, gru_hidden_channel):
+    def __init__(self, 
+                 batch_size, 
+                 col_list, 
+                 col_dims, 
+                 ad_col_index, 
+                 dis_col_index, 
+                 embedding_dim, 
+                 gin_hidden_channel, 
+                 train_eps, 
+                 gin_layers, 
+                 gru_hidden_channel, 
+                 dropout_p: float = 0.2,          
+                 gin_out_dropout_p = None):
         '''
         Args:
             col_info(list): [col_dims, col_list]
@@ -128,6 +140,14 @@ class GinGru(nn.Module):
         self.col_list = col_list
         self.hidden_channel = gin_hidden_channel
 
+        self.dropout_p = float(dropout_p)
+        self.gin_out_dropout_p = float(gin_out_dropout_p) if gin_out_dropout_p is not None else float(dropout_p)
+
+        self.dropout_mlp = nn.Dropout(self.dropout_p)
+        self.dropout_gin_out = nn.Dropout(self.gin_out_dropout_p)
+        self.dropout_after_gru = nn.Dropout(self.dropout_p)
+
+
         self.ad_idx_t = torch.tensor(ad_col_index)
         self.dis_idx_t = torch.tensor(dis_col_index)
 
@@ -140,7 +160,7 @@ class GinGru(nn.Module):
              nn.Linear(embedding_dim, gin_hidden_channel),
              nn.LayerNorm(gin_hidden_channel),
              nn.ReLU(),
-
+             nn.Dropout(self.dropout_p),  
              nn.Linear(gin_hidden_channel, gin_hidden_channel) # 논문에서 적용된 배치 정규화 
              # nn.LayerNorm(h_dim),  # 마지막 레이어 이후에는 선택적
         )
@@ -149,7 +169,7 @@ class GinGru(nn.Module):
              nn.Linear(gin_hidden_channel, gin_hidden_channel),
              nn.LayerNorm(gin_hidden_channel),
              nn.ReLU(),
-
+             nn.Dropout(self.dropout_p),
              nn.Linear(gin_hidden_channel, gin_hidden_channel) # 논문에서 적용된 배치 정규화 
              # nn.LayerNorm(h_dim),  # 마지막 레이어 이후에는 선택적
         )
@@ -170,8 +190,12 @@ class GinGru(nn.Module):
         self.classifier_b = nn.Sequential(
             nn.Linear(gru_hidden_channel, gru_hidden_channel * 2),
             nn.ReLU(),
+            nn.Dropout(self.dropout_p),
             nn.Linear(gru_hidden_channel * 2, 1)
         )
+        self.gin_nn_input = gin_nn_input
+        self.gin_nn = gin_nn
+        self.reset_parameters() # He initialization (added 1218)
 
     def forward(self, x_batch: torch.Tensor, LOS_batch: torch.Tensor, template_edge_index, device):
         '''
@@ -200,6 +224,7 @@ class GinGru(nn.Module):
         sum_pooled = []
         for layer in self.gin_layers:
             x_after_gin = layer(x_after_gin, template_edge_index) # [B * 2 * N, F(32)]
+            x_after_gin = self.dropout_gin_out(x_after_gin)         # GIN 레이어 출력에도 Dropout
             x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel) # [B * 2, N, F]
             x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
             sum_pooled.append(x_sum)
@@ -214,12 +239,34 @@ class GinGru(nn.Module):
 
         gru_h = gru_h.squeeze(0)
 
+        # GRU dropout이 없으니 여기서 한 번
+        gru_h = self.dropout_after_gru(gru_h)
+
+
         # PackedSequence로 만들었기 때문에 (시간 길이 순 정렬) 역정렬해야 함
         inv_indices = torch.argsort(sorted_indices.to(device))
-        gru_h = gru_h[inv_indices]                           
+        gru_h = gru_h[inv_indices]             
+                      
 
         # Classifier에 입력
         return self.classifier_b(gru_h)
+    
+    def reset_parameters(self):
+        # GIN MLP들
+        for block in [self.gin_nn_input, self.gin_nn]:
+            for m in block.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+                    if m.bias is not None:
+                        nn.init.zeros_(m.bias)
+
+        # classifier
+        for m in self.classifier_b.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
 
 
 
