@@ -12,22 +12,6 @@ from .entity_embedding import EntityEmbeddingBatch3
 
 cur_dir = os.path.dirname(__file__)
 
-def get_edge_index_2(edge_index, num_nodes, batch_size):
-    '''
-    Args:
-        edge_index: ad, dis 이어져 있는 edge_index, gin_1에서 사용했던 것
-    '''
-    merged_num_nodes = num_nodes * batch_size
-    start_node = torch.arange(0, merged_num_nodes) # [batch_size * num_nodes] == [merged_num_nodes]
-    end_node = start_node + merged_num_nodes       # [batch_size * num_nodes] == [merged_num_nodes]
-    
-    start_node = start_node.unsqueeze(dim=0)       # [1, merged_num_nodes]
-    end_node = end_node.unsqueeze(dim=0)           # [1, merged_num_nodes]
-    new_edge_index = torch.cat((start_node, end_node), dim = 0) # [2, merged_num_nodes]
-
-    return torch.cat((edge_index, new_edge_index), dim=1) # # [2, 원래 edge_index + merged_num_nodes]
-
-
 class GatedFusion(nn.Module):
     def __init__(self, dim, hidden_dim=None, dropout=0.0):
         super().__init__()
@@ -45,13 +29,13 @@ class GatedFusion(nn.Module):
         w = F.softmax(self.score(x), dim=-1) # [batch, 3]
         A = self.dropout(A)
         B = self.dropout(B)
-        fused = w[:, 0:1]* A + w[:, 1:2] * B, w[:, 2:3] * C
+        fused = w[:, 0:1]* A + w[:, 1:2] * B + w[:, 2:3] * C
         return fused, w
 
 
 class CtmpGIN(nn.Module):
     def __init__(self, 
-                 col_dims, 
+                 col_info,
                  embedding_dim, 
                  gin_hidden_channel, 
                  gin_1_layers, 
@@ -59,13 +43,19 @@ class CtmpGIN(nn.Module):
                  gin_2_layers, 
                  dropout_ratio, 
                  device,
+                 dropout_p = 0.2,
                  los_embedding_dim=8, 
+                 max_los=37,
                  train_eps=True):
         super().__init__()
-        self.col_dims = col_dims
+        self.col_list, self.col_dims, self.ad_col_index, self.dis_col_index = col_info
         self.entity_embedding_layer = EntityEmbeddingBatch3(col_dims=self.col_dims, embedding_dim=embedding_dim)
-        self.embed_los = EntityEmbeddingBatch3(col_dims=[37], embedding_dim=los_embedding_dim)
+        self.embed_los = EntityEmbeddingBatch3(col_dims=[max_los + 1], embedding_dim=los_embedding_dim)
         self.device = device
+        self.dropout_p = dropout_p
+
+        self.gin_hidden_channel = gin_hidden_channel
+        self.gin_hidden_channel_2 = gin_hidden_channel_2
 
         # GIN_1
         gin_nn_input = nn.Sequential(
@@ -115,11 +105,20 @@ class CtmpGIN(nn.Module):
 
         # GIN_2        
         self.gin_2 = nn.ModuleList()
-        gin2_input = GINEConv(gin_nn_input2, train_eps=train_eps, edge_dim=1)
+        gin2_input = GINEConv(gin_nn_input2, train_eps=train_eps, edge_dim=los_embedding_dim)
         self.gin_2.append(gin2_input)
         for _ in range(gin_2_layers - 1):
-            gin_hidden_layer = GINEConv(gin_nn2, train_eps=train_eps, edge_dim=1)
+            gin_hidden_layer = GINEConv(gin_nn2, train_eps=train_eps, edge_dim=los_embedding_dim)
             self.gin_2.append(gin_hidden_layer)
+
+        # Classifier
+        classifier_ch = self.gin_hidden_channel * 2 + self.gin_hidden_channel_2
+        self.classifier_b = nn.Sequential(
+            nn.Linear(classifier_ch, classifier_ch * 2),
+            nn.ReLU(),
+            nn.Dropout(self.dropout_p),
+            nn.Linear(classifier_ch * 2, 1)
+        )
 
         self.dropout = nn.Dropout(dropout_ratio)
 
@@ -146,16 +145,68 @@ class CtmpGIN(nn.Module):
         x_after_gin = x_flatten
         for layer in self.gin_1:
             x_after_gin = layer(x_after_gin, edge_index) # [B * 2 * N, F(32)]
-            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.hidden_channel) # [B * 2, N, F]
+            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.gin_hidden_channel) # [B * 2, N, F]
             x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
         
-    def get_edge_attr(self, los):
-        '''
-        원래 los는 range(1, 38) 안에 있는 정수 값
-        그렇지만 이에 대해 엔티티 임베딩을 적용하기 위해서는 0-index 형식으로 바꾸어 주어야 한다.
-        즉 los - 1한 것을 엔티티 임베딩 룩업 테이블에 넣어야 제대로 작동한다.
-        '''
-        los -= 1
-        los_emb = self.embed_los(los)
+        ad_dis = x_sum.clone()
         
-        pass
+        edge_index_2, edge_attr = self.get_new_edge(x=x, edge_index=edge_index, los=los, batch_size=batch_size)
+        # GIN_2에 입력
+        for layer in self.gin_2:
+            x_after_gin = layer(x_after_gin, edge_index_2)
+            x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.gin_hidden_channel_2)
+            x_sum = torch.sum(x_graph, dim=1)
+        
+        ad, dis, x_sum
+
+    def get_new_edge(self, x, edge_index, los, batch_size):
+        device = edge_index.device
+        num_nodes = len(self.ad_col_index)
+        new_edge_index = self.get_edge_index_2(edge_index=edge_index, num_nodes=num_nodes, batch_size=batch_size)
+        new_edge_attr = self.get_edge_attr(los=los, edge_index=edge_index, batch_size=batch_size, num_nodes=num_nodes)
+        new_edge_index.to(device)
+        new_edge_attr.to(device)
+        return new_edge_index, new_edge_attr
+        
+
+    def get_edge_index_2(self, edge_index, num_nodes, batch_size):
+        '''
+        Args:
+            edge_index: ad, dis 이어져 있는 edge_index, gin_1에서 사용했던 것
+        '''
+        merged_num_nodes = num_nodes * batch_size
+        start_node = torch.arange(0, merged_num_nodes) # [batch_size * num_nodes] == [merged_num_nodes]
+        end_node = start_node + merged_num_nodes       # [batch_size * num_nodes] == [merged_num_nodes]
+        
+        start_node = start_node.unsqueeze(dim=0)       # [1, merged_num_nodes]
+        end_node = end_node.unsqueeze(dim=0)           # [1, merged_num_nodes]
+        new_edge_index = torch.cat((start_node, end_node), dim = 0) # [2, merged_num_nodes]
+
+        return torch.cat((edge_index, new_edge_index), dim=1) # # [2, 원래 edge_index + merged_num_nodes]
+    
+    def get_edge_attr(self, los, edge_index, batch_size, num_nodes):
+        """
+        edge_index: internal edges (E_internal)
+        los: (B,) with values in [1..max_los]
+        returns: (E_internal + B*num_nodes, los_embedding_dim)
+        """
+        device = edge_index.device
+        E_internal = edge_index.size(1)
+        E_cross = batch_size * num_nodes  # new_edge_index.size(1)와 동일해야 함
+
+        # 1) internal edges -> NONE token (0)
+        none_idx = torch.zeros(E_internal, dtype=torch.long, device=device)   # (E_internal,)
+        edge_attr_internal = self.embed_los(none_idx)                         # (E_internal, D)
+
+        # 2) cross edges -> LOS token (1..max_los), sample별로 num_nodes번 반복
+        los = los.view(batch_size).to(device).long()                          # (B,)
+        los_idx = los.repeat_interleave(num_nodes)                            # (B*N,) = (E_cross,)
+        edge_attr_cross = self.embed_los(los_idx)                             # (E_cross, D)
+
+        return torch.cat([edge_attr_internal, edge_attr_cross], dim=0)        # (E_total, D)
+
+            
+
+        
+
+        
