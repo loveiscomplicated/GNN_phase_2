@@ -4,19 +4,16 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-
-
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
-
 from utils.write_log import enable_dual_output
 from utils.early_stopper import EarlyStopper
 from utils.processing_utils import mi_edge_index_batched, train_test_split_customed
 from utils.device_set import device_set
 from teds_tensor_dataset import TEDSTensorDataset
-from models.gin_gru import GinGru
+from models.ctmp_gin import CtmpGIN
 
 cur_dir = os.path.dirname(__file__)
-enable_dual_output(f'gingru_1222.txt')
+enable_dual_output(f'ctmp_gin_1222.txt')
 
 def train(model, dataloader, criterion, optimizer, edge_index, device):
     model.train()
@@ -32,7 +29,6 @@ def train(model, dataloader, criterion, optimizer, edge_index, device):
             x_batch,
             los_batch,
             edge_index,
-            device
         )
 
         logits = logits.squeeze(1)
@@ -66,7 +62,6 @@ def evaluate(model, val_dataloader, criterion, decision_threshold, device, edge_
                 x_batch,
                 los_batch,
                 edge_index,
-                device
             )
 
             logits = logits.squeeze(1)
@@ -155,14 +150,19 @@ def load_checkpoint(model, optimizer, scheduler, filename, map_location=None):
 
 if __name__ == "__main__":
     # device = device_set()
-    device = torch.device('cpu')
+    device = torch.device('mps')
     BATCH_SIZE = 32
     embedding_dim = 32
     gin_hidden_channel = 32
+    gin_1_layers = 2
+    gin_hidden_channel_2 = 32
+    gin_2_layers = 2
     train_eps = True
     gin_layers = 2
     gru_hidden_channel = 64
     decision_threshold = 0.5
+    dropout_p = 0.2
+    los_embedding_dim = 8
 
     EPOCH = 100
     scheduler_patience = 5
@@ -170,13 +170,8 @@ if __name__ == "__main__":
     learning_rate = 0.001
 
     sample = False
-
-    if sample:
-        root = os.path.join(cur_dir, 'data_tensor_sampled')
-        model_path = os.path.join(cur_dir, 'checkpoints', 'gingru', 'sampled') #####
-    else:
-        root = os.path.join(cur_dir, 'data_tensor_cache')
-        model_path = os.path.join(cur_dir, 'checkpoints', 'gingru', 'real') #####
+    root = os.path.join(cur_dir, 'data_tensor_cache')
+    model_path = os.path.join(cur_dir, 'checkpoints', 'ctmp_gin') #####
 
     mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
 
@@ -194,28 +189,19 @@ if __name__ == "__main__":
     
     edge_index = edge_index.to(device) # type: ignore
     
-    '''model = GinGru(batch_size=BATCH_SIZE,
-                   col_dims=col_dims,
-                   col_list=col_list,
-                   ad_col_index=ad_col_index, 
-                   dis_col_index=dis_col_index,
-                   embedding_dim=embedding_dim,
-                   gin_hidden_channel=gin_hidden_channel,
-                   train_eps=train_eps,
-                   gin_layers=gin_layers,
-                   gru_hidden_channel=gru_hidden_channel)'''
     
-    from models import gin_gru_2_point
-    model = gin_gru_2_point.GinGru(batch_size=BATCH_SIZE,
-                   col_dims=col_dims,
-                   col_list=col_list,
-                   ad_col_index=ad_col_index, 
-                   dis_col_index=dis_col_index,
-                   embedding_dim=embedding_dim,
-                   gin_hidden_channel=gin_hidden_channel,
-                   train_eps=train_eps,
-                   gin_layers=gin_layers,
-                   gru_hidden_channel=gru_hidden_channel)
+    model = CtmpGIN(col_info=dataset.col_info,
+                    embedding_dim=embedding_dim,
+                    gin_hidden_channel=gin_hidden_channel,
+                    gin_1_layers=gin_1_layers,
+                    gin_hidden_channel_2=gin_hidden_channel_2,
+                    gin_2_layers=gin_2_layers,
+                    device=device,
+                    dropout_p=dropout_p,
+                    los_embedding_dim=los_embedding_dim,
+                    max_los=37,
+                    train_eps= True,
+                    gate_hidden_ch=None)
 
     model = model.to(device=device)
     
@@ -271,8 +257,8 @@ if __name__ == "__main__":
         los_batch = los_batch.to(device)
         edge_index = edge_index.to(device)
         y = y.to(device)
-
-        logits = model(x_batch, los_batch, edge_index, device)
+        print(edge_index.shape)
+        logits = model(x_batch, los_batch, edge_index)
         probs = torch.sigmoid(logits)
 
         print("logits mean/std:", logits.mean().item(), logits.std().item())
