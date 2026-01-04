@@ -7,13 +7,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from utils.write_log import enable_dual_output
 from utils.early_stopper import EarlyStopper
-from utils.processing_utils import mi_edge_index_batched, train_test_split_customed
+from utils.processing_utils import mi_edge_index_batched, train_test_split_customed, mi_edge_index_batched_cor
 from utils.device_set import device_set
 from teds_tensor_dataset import TEDSTensorDataset
 from models.ctmp_gin import CtmpGIN
 
 cur_dir = os.path.dirname(__file__)
-enable_dual_output(f'ctmp_gin_1222.txt')
+enable_dual_output(f'ctmp_gin_1226.txt')
 
 def train(model, dataloader, criterion, optimizer, edge_index, device):
     model.train()
@@ -158,8 +158,6 @@ if __name__ == "__main__":
     gin_hidden_channel_2 = 32
     gin_2_layers = 2
     train_eps = True
-    gin_layers = 2
-    gru_hidden_channel = 64
     decision_threshold = 0.5
     dropout_p = 0.2
     los_embedding_dim = 8
@@ -173,7 +171,9 @@ if __name__ == "__main__":
     root = os.path.join(cur_dir, 'data_tensor_cache')
     model_path = os.path.join(cur_dir, 'checkpoints', 'ctmp_gin') #####
 
-    mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
+    # mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
+    mi_dict_ad_path = os.path.join(root, 'data', 'mi_dict_ad.pickle')
+    mi_dict_dis_path = os.path.join(root, 'data', 'mi_dict_dis.pickle')
 
     dataset = TEDSTensorDataset(root)
 
@@ -181,11 +181,12 @@ if __name__ == "__main__":
 
     num_nodes = len(ad_col_index)
     
-    edge_index = mi_edge_index_batched(batch_size=BATCH_SIZE,
-                                            mi_dict_path=mi_dict_path,
-                                            num_nodes=num_nodes,
-                                            top_k=6,
-                                            return_edge_attr=False)
+    edge_index = mi_edge_index_batched_cor(batch_size=BATCH_SIZE,
+                                           num_nodes=num_nodes,
+                                           mi_dict_ad_path=mi_dict_ad_path,
+                                           mi_dict_dis_path=mi_dict_dis_path,
+                                           top_k=6,
+                                           return_edge_attr=False)
     
     edge_index = edge_index.to(device) # type: ignore
     

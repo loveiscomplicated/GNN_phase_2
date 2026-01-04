@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 import pickle
+from copy import deepcopy
 from torch_geometric.utils import to_undirected
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Subset
@@ -286,6 +287,128 @@ def mi_edge_index_batched(batch_size, num_nodes, mi_dict_path, top_k=6, threshol
         return batched_edge_index, batched_attr_list
     
     return batched_edge_index
+
+def edge_index_change(mi_dict_path):
+    with open(mi_dict_path,  'rb') as f:
+        mi_dict = pickle.load(f)
+    
+    mi_dict_ad  = {}
+    mi_dict_dis = {}
+
+    cols        = list(mi_dict.keys())
+    ad_cols     = []
+    dis_cols    = []
+
+    for col in cols:
+        if '_D' in col:
+            dis_cols.append(col)
+        else:
+            ad_cols.append(col)
+
+    change      = [i[:-2] for i in dis_cols]
+    common_set  = set(ad_cols) - set(change)
+    dis_col_    = list(common_set.union(set(dis_cols)))
+
+    for col in ad_cols:
+        if col == 'LOS' : continue
+        ad_cols_copy = deepcopy(ad_cols)
+        ad_cols_copy.remove(col)
+        series = mi_dict[col]
+        mi_dict_ad[col]  = series[ad_cols_copy]
+    
+    for col in dis_col_:
+        if col == 'LOS' : continue
+        dis_cols_copy = deepcopy(dis_col_)
+        dis_cols_copy.remove(col)
+        series = mi_dict[col]
+        mi_dict_dis[col] = series[dis_cols_copy]
+
+    mi_dict_dis_2 = {}
+    for col in mi_dict_dis.keys():
+        series = mi_dict_dis[col]
+        index = mi_dict_dis[col].index
+
+        if '_D' in col:
+            new_col = col[:-2]
+        else:
+            new_col = col
+        
+        new_index = []
+        for i in index:
+            if '_D' in i:
+                new_index.append(i[:-2])
+            else:
+                new_index.append(i)
+        new_series = series.reindex(new_index)
+        mi_dict_dis_2[new_col] = new_series
+        
+    return mi_dict_ad, mi_dict_dis_2
+
+def mi_edge_index_batched_cor(batch_size, num_nodes, mi_dict_ad_path, mi_dict_dis_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False, edge_attr_single=None):
+    """
+    배치 처리를 위한 Wrapper 함수
+    """
+    if return_edge_attr:
+        single_ad, edge_attr_ad= mi_edge_index_improved(
+            mi_dict_path=mi_dict_ad_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+    else:
+        single_ad = mi_edge_index_improved(
+            mi_dict_path=mi_dict_ad_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+    
+    if return_edge_attr:
+        single_dis, edge_attr_dis= mi_edge_index_improved(
+            mi_dict_path=mi_dict_dis_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+    else:
+        single_dis = mi_edge_index_improved(
+            mi_dict_path=mi_dict_dis_path, 
+            top_k=top_k, 
+            threshold=threshold, 
+            pruning_ratio=pruning_ratio,
+            return_edge_attr=return_edge_attr
+        )
+
+    edge_list = []
+    attr_list = []
+
+    for g in range(batch_size):
+        offset = num_nodes * g
+        edge_i = single_ad + offset
+        edge_list.append(edge_i)
+
+        if return_edge_attr:
+            attr_list.append(edge_attr_ad)
+    
+    offset_ad = offset
+    
+    for g in range(batch_size):
+        offset = num_nodes * g + offset_ad
+        edge_i = single_dis + offset
+        edge_list.append(edge_i)
+
+        if return_edge_attr:
+            attr_list.append(edge_attr_dis)
+
+    batched_edge_index = torch.cat(edge_list, dim=1)
+    if return_edge_attr:
+        batched_attr_list = torch.cat(attr_list, dim=0)
+        return batched_edge_index, batched_attr_list
+    return batched_edge_index
+    
 
 def mi_edge_index_batched_for_gin_baseline(batch_size, num_nodes, mi_dict_path, top_k=6, threshold=0.01, pruning_ratio=0.5, return_edge_attr=False, edge_attr_single=None):
     """

@@ -12,7 +12,7 @@ from .entity_embedding import EntityEmbeddingBatch3
 
 cur_dir = os.path.dirname(__file__)
 
-class GatedFusion(nn.Module):
+'''class GatedFusion(nn.Module):
     def __init__(self, in_dim, out_dim, hidden_dim=None, dropout=0.0):
         super().__init__()
         hidden_dim = hidden_dim or in_dim
@@ -34,7 +34,29 @@ class GatedFusion(nn.Module):
         C = self.dropout(C)
         fused = w[:, 0:1]*A + w[:, 1:2]*B + w[:, 2:3]*C
         return fused, w
+'''
 
+class GatedFusion(nn.Module):
+    def __init__(self, in_dim, out_dim, hidden_dim=None, dropout=0.0):
+        super().__init__()
+        hidden_dim = hidden_dim or in_dim
+        self.score = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, 3)
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.out_dim = out_dim
+
+    def forward(self, A, B, C):
+        x = torch.cat([A, B, C], dim=-1)
+        logits = self.score(x)                 # [B,3]
+        w = F.softmax(logits, dim=-1)
+        A = self.dropout(A); B = self.dropout(B); C = self.dropout(C)
+        fused = w[:, 0:1]*A + w[:, 1:2]*B + w[:, 2:3]*C
+        return fused, w, logits
+    
 
 class CtmpGIN(nn.Module):
     def __init__(self, 
@@ -160,7 +182,7 @@ class CtmpGIN(nn.Module):
         for layer in self.gin_1:
             x_after_gin = layer(x_after_gin, edge_index) # [B * 2 * N, F(32)]
             x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.gin_hidden_channel) # [B * 2, N, F]
-            x_sum = torch.sum(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
+            x_sum = torch.mean(x_graph, dim=1) # [B * 2, N(60), F(32)] --> [B * 2, F(32)]
         
         ad_dis_emb= x_sum.clone() # [B * 2, F(32)]
         ad_emb = ad_dis_emb[:batch_size, :]
@@ -171,7 +193,7 @@ class CtmpGIN(nn.Module):
         for layer in self.gin_2:
             x_after_gin = layer(x=x_after_gin, edge_index=edge_index_2, edge_attr=edge_attr)
             x_graph = x_after_gin.reshape(batch_size * 2, num_nodes, self.gin_hidden_channel_2)
-            x_sum = torch.sum(x_graph, dim=1)
+            x_sum = torch.mean(x_graph, dim=1)
 
         merged_all = x_sum  # [2B, F2]
         merged = 0.5 * (merged_all[:batch_size] + merged_all[batch_size:])  # [B, F2]
@@ -181,7 +203,7 @@ class CtmpGIN(nn.Module):
         ad_f = self.proj_ad(ad_emb)          # [B, d]
         dis_f = self.proj_dis(dis_emb)       # [B, d]
 
-        fused, w = self.gated_fusion(ad_f, dis_f, merged_f)
+        fused, w, logits = self.gated_fusion(ad_f, dis_f, merged_f)
         logit = self.classifier_b(fused)
 
         return logit
@@ -381,9 +403,9 @@ class CtmpGIN_return_emb(nn.Module):
         dis_f = self.proj_dis(dis_emb)       # [B, d]
 
         # 변경:
-        fused, w = self.gated_fusion(ad_f, dis_f, merged_f)
-        print("POOLING CHECK:", x_graph.sum(dim=1).abs().mean().item(), x_graph.mean(dim=1).abs().mean().item())
-        return fused, w, ad_f, dis_f, merged_f
+        fused, w, logits = self.gated_fusion(ad_f, dis_f, merged_f)
+        return fused, w, ad_f, dis_f, merged_f, logits
+
 
     def get_new_edge(self, edge_index, los, batch_size):
         device = edge_index.device

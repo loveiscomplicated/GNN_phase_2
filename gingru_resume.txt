@@ -1,0 +1,151 @@
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+GinGru(
+  (dropout_gin_out): Dropout(p=0.2, inplace=False)
+  (dropout_after_gru): Dropout(p=0.2, inplace=False)
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1143, 32)
+  )
+  (gin_layers): ModuleList(
+    (0): GINConv(nn=Sequential(
+      (0): Linear(in_features=33, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Dropout(p=0.2, inplace=False)
+      (4): Linear(in_features=32, out_features=32, bias=True)
+    ))
+    (1): GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Dropout(p=0.2, inplace=False)
+      (4): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (gru_layer): GRU(64, 64)
+  (classifier_b): Sequential(
+    (0): Linear(in_features=64, out_features=128, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=128, out_features=1, bias=True)
+  )
+  (gin_nn_input): Sequential(
+    (0): Linear(in_features=33, out_features=32, bias=True)
+    (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=32, out_features=32, bias=True)
+  )
+  (gin_nn): Sequential(
+    (0): Linear(in_features=32, out_features=32, bias=True)
+    (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=32, out_features=32, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 74,371
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+GinGru(
+  (dropout_gin_out): Dropout(p=0.2, inplace=False)
+  (dropout_after_gru): Dropout(p=0.2, inplace=False)
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1143, 32)
+  )
+  (gin_layers): ModuleList(
+    (0): GINConv(nn=Sequential(
+      (0): Linear(in_features=33, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Dropout(p=0.2, inplace=False)
+      (4): Linear(in_features=32, out_features=32, bias=True)
+    ))
+    (1): GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Dropout(p=0.2, inplace=False)
+      (4): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (gru_layer): GRU(64, 64)
+  (classifier_b): Sequential(
+    (0): Linear(in_features=64, out_features=128, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=128, out_features=1, bias=True)
+  )
+  (gin_nn_input): Sequential(
+    (0): Linear(in_features=33, out_features=32, bias=True)
+    (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=32, out_features=32, bias=True)
+  )
+  (gin_nn): Sequential(
+    (0): Linear(in_features=32, out_features=32, bias=True)
+    (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=32, out_features=32, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 74,371
+
+[Resume] Loaded: /Users/jeong-yunseong/Documents/programming/Phase_2/checkpoints/gingru/real/1218_gingru_epoch_37_loss_0.3287.pth
+[Resume] start_epoch=38, best_val_loss=0.328680
+
+
+[Epoch 38/100]
+  [Train] LR: 0.000010 | Loss: 0.3365
+  [Valid] Loss: 0.3287 | Acc: 0.8583, Prec: 0.8576, Rec: 0.8547, F1: 0.8559, AUC: 0.9319
+
+[Epoch 39/100]
+  [Train] LR: 0.000010 | Loss: 0.3370
+  [Valid] Loss: 0.3288 | Acc: 0.8586, Prec: 0.8577, Rec: 0.8554, F1: 0.8564, AUC: 0.9322
+
+[Epoch 40/100]
+  [Train] LR: 0.000010 | Loss: 0.3372
+  [Valid] Loss: 0.3291 | Acc: 0.8583, Prec: 0.8571, Rec: 0.8553, F1: 0.8561, AUC: 0.9318
+
+[Epoch 41/100]
+  [Train] LR: 0.000010 | Loss: 0.3371
+  [Valid] Loss: 0.3293 | Acc: 0.8582, Prec: 0.8573, Rec: 0.8549, F1: 0.8560, AUC: 0.9314
+
+[Epoch 42/100]
+  [Train] LR: 0.000010 | Loss: 0.3371
+  [Valid] Loss: 0.3294 | Acc: 0.8584, Prec: 0.8576, Rec: 0.8551, F1: 0.8562, AUC: 0.9312
+
+[Epoch 43/100]
+  [Train] LR: 0.000001 | Loss: 0.3371
+  [Valid] Loss: 0.3296 | Acc: 0.8583, Prec: 0.8574, Rec: 0.8550, F1: 0.8560, AUC: 0.9311
+
+[Epoch 44/100]
+  [Train] LR: 0.000001 | Loss: 0.3379
+  [Valid] Loss: 0.3296 | Acc: 0.8582, Prec: 0.8574, Rec: 0.8548, F1: 0.8559, AUC: 0.9312
+
+[Epoch 45/100]
+  [Train] LR: 0.000001 | Loss: 0.3378
+  [Valid] Loss: 0.3295 | Acc: 0.8582, Prec: 0.8573, Rec: 0.8549, F1: 0.8559, AUC: 0.9312
+
+[Epoch 46/100]
+  [Train] LR: 0.000001 | Loss: 0.3376
+  [Valid] Loss: 0.3294 | Acc: 0.8583, Prec: 0.8576, Rec: 0.8549, F1: 0.8560, AUC: 0.9312
+🛑 Early stopping triggered after 10 epochs without improvement.
+
+[Epoch 47/100]
+  [Train] LR: 0.000001 | Loss: 0.3375
+  [Valid] Loss: 0.3292 | Acc: 0.8584, Prec: 0.8577, Rec: 0.8548, F1: 0.8560, AUC: 0.9313
+
+--- Early Stopping activated. Learning terminated. ---
+
+--- 학습 완료 ---
+
+[Test] Loss: 0.3299 | Acc: 0.8579, Prec: 0.8574, Rec: 0.8542, F1: 0.8555, AUC: 0.9310
