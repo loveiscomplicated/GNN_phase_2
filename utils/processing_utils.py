@@ -569,8 +569,6 @@ def get_total_dim(df: pd.DataFrame):
     return train_dataloader, val_dataloader, test_dataloader'''
 
 
-
-
 def train_test_split_customed(dataset, batch_size,
                               ratio=[0.7, 0.15, 0.15],
                               seed=42,
