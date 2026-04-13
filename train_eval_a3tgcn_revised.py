@@ -147,6 +147,7 @@ if __name__ == "__main__":
 
     mi_dict_path = os.path.join(root, 'data', 'mi_dict_static.pickle')
     edge_index = mi_edge_index_batched(batch_size=BATCH_SIZE,
+                                       num_nodes=60,
                                             mi_dict_path=mi_dict_path,
                                             top_k=6,
                                             return_edge_attr=False)

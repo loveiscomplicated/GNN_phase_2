@@ -189,7 +189,7 @@ if __name__ == "__main__":
                                            return_edge_attr=False)
     
     edge_index = edge_index.to(device) # type: ignore
-    
+    print(edge_index.shape)
     
     model = CtmpGIN(col_info=dataset.col_info,
                     embedding_dim=embedding_dim,

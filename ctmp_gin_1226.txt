@@ -829,3 +829,168 @@ Valid preds label counts: tensor([20, 12], device='mps:0')
 Valid true label counts: tensor([21, 11], device='mps:0')
 
 [Test] Loss: 0.2768 | Acc: 0.8810, Prec: 0.8798, Rec: 0.8791, F1: 0.8794, AUC: 0.9528
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+torch.Size([2, 26880])
+CtmpGIN(
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1143, 32)
+  )
+  (embed_los): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(38, 8)
+  )
+  (gin_1): ModuleList(
+    (0-1): 2 x GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (gin_2): ModuleList(
+    (0-1): 2 x GINEConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (proj_ad): Linear(in_features=32, out_features=32, bias=True)
+  (proj_dis): Linear(in_features=32, out_features=32, bias=True)
+  (proj_merged): Linear(in_features=32, out_features=32, bias=True)
+  (gated_fusion): GatedFusion(
+    (score): Sequential(
+      (0): Linear(in_features=96, out_features=96, bias=True)
+      (1): ReLU()
+      (2): Dropout(p=0.2, inplace=False)
+      (3): Linear(in_features=96, out_features=3, bias=True)
+    )
+    (dropout): Dropout(p=0.2, inplace=False)
+  )
+  (classifier_b): Sequential(
+    (0): Linear(in_features=32, out_features=64, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=64, out_features=1, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 61,112
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+torch.Size([2, 26880])
+logits mean/std: -0.06477902829647064 0.03303558751940727
+probs min/max/mean: 0.4701637029647827 0.5024376511573792 0.48381495475769043
+y label mean: 0.3125
+pos logits mean: -0.053912222385406494
+neg logits mean: -0.06971848011016846
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+torch.Size([2, 26880])
+CtmpGIN(
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1143, 32)
+  )
+  (embed_los): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(38, 8)
+  )
+  (gin_1): ModuleList(
+    (0-1): 2 x GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (gin_2): ModuleList(
+    (0-1): 2 x GINEConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (proj_ad): Linear(in_features=32, out_features=32, bias=True)
+  (proj_dis): Linear(in_features=32, out_features=32, bias=True)
+  (proj_merged): Linear(in_features=32, out_features=32, bias=True)
+  (gated_fusion): GatedFusion(
+    (score): Sequential(
+      (0): Linear(in_features=96, out_features=96, bias=True)
+      (1): ReLU()
+      (2): Dropout(p=0.2, inplace=False)
+      (3): Linear(in_features=96, out_features=3, bias=True)
+    )
+    (dropout): Dropout(p=0.2, inplace=False)
+  )
+  (classifier_b): Sequential(
+    (0): Linear(in_features=32, out_features=64, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=64, out_features=1, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 61,112
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+torch.Size([2, 26880])
+logits mean/std: 0.08316880464553833 0.04098782688379288
+probs min/max/mean: 0.49962928891181946 0.5408307909965515 0.520771861076355
+y label mean: 0.3125
+pos logits mean: 0.07644819468259811
+neg logits mean: 0.08622363954782486
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+torch.Size([2, 26880])
+CtmpGIN(
+  (entity_embedding_layer): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(1143, 32)
+  )
+  (embed_los): EntityEmbeddingBatch3(
+    (embedding_layer): Embedding(38, 8)
+  )
+  (gin_1): ModuleList(
+    (0-1): 2 x GINConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (gin_2): ModuleList(
+    (0-1): 2 x GINEConv(nn=Sequential(
+      (0): Linear(in_features=32, out_features=32, bias=True)
+      (1): LayerNorm((32,), eps=1e-05, elementwise_affine=True)
+      (2): ReLU()
+      (3): Linear(in_features=32, out_features=32, bias=True)
+    ))
+  )
+  (proj_ad): Linear(in_features=32, out_features=32, bias=True)
+  (proj_dis): Linear(in_features=32, out_features=32, bias=True)
+  (proj_merged): Linear(in_features=32, out_features=32, bias=True)
+  (gated_fusion): GatedFusion(
+    (score): Sequential(
+      (0): Linear(in_features=96, out_features=96, bias=True)
+      (1): ReLU()
+      (2): Dropout(p=0.2, inplace=False)
+      (3): Linear(in_features=96, out_features=3, bias=True)
+    )
+    (dropout): Dropout(p=0.2, inplace=False)
+  )
+  (classifier_b): Sequential(
+    (0): Linear(in_features=32, out_features=64, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=64, out_features=1, bias=True)
+  )
+)
+학습 가능한 파라미터 개수: 61,112
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+torch.Size([2, 26880])
+logits mean/std: -0.03492707014083862 0.02859470434486866
+probs min/max/mean: 0.473407506942749 0.5075468420982361 0.49127092957496643
+y label mean: 0.3125
+pos logits mean: -0.045530498027801514
+neg logits mean: -0.03010733053088188

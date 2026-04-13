@@ -1,0 +1,38 @@
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+[Loaded checkpoint] 1218_ctmp_epoch_37_loss_0.2717.pth
+  start_epoch: 38
+  best_loss: 0.27172609880699206
+
+--- Test Result ---
+[Test] Loss: 0.7474 | Acc: 0.5558, Prec: 0.2779, Rec: 0.5000, F1: 0.3572, AUC: 0.8379
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+[Loaded checkpoint] 1218_gingru_epoch_36_loss_0.2738.pth
+  start_epoch: 37
+  best_loss: 0.2738136930952616
+
+--- Test Result ---
+[Test] Loss: 0.2762 | Acc: 0.8811, Prec: 0.8796, Rec: 0.8796, F1: 0.8796, AUC: 0.9527
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+저장되어 있는 전처리된 데이터가 있습니다. 해당 데이터를 불러오는 중..
+불러오기 완료
+Train Set Size: 975896
+Valid Set Size: 209119
+Test Set Size: 209123
+[Loaded checkpoint] ctmp_epoch_36_loss_0.2738.pth
+  start_epoch: 37
+  best_loss: 0.2738136930952616
+
+--- Test Result ---
+[Test] Loss: 0.2762 | Acc: 0.8811, Prec: 0.8796, Rec: 0.8796, F1: 0.8796, AUC: 0.9527
